@@ -1,4 +1,4 @@
-export type Rooms = {
+export type RoomInfo = {
     name: string;
     isPersisted: boolean;
 }

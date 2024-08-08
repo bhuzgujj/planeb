@@ -11,7 +11,10 @@
         use:enhance={(res) => {
                 return async ({ result }) => {
                     if (result.type === 'success' && result?.data?.location) {
-                        console.log(result)
+                        await fetch("/rooms", {method: "POST", body: JSON.stringify({
+                            name: result?.data?.name,
+                            persisted: result?.data?.persisted
+                        })})
                         await goto(result?.data?.location.toString());
                     }
                 };

@@ -1,4 +1,3 @@
-import {createRoom} from "$lib/database.js";
 import {fail} from "@sveltejs/kit";
 
 export const actions = {
@@ -13,9 +12,10 @@ export const actions = {
                 }
             })
         } else {
-            await createRoom(name, persisted)
             return {
-                location: "/rooms"
+                location: "/rooms/",
+                name,
+                persisted
             }
         }
     }

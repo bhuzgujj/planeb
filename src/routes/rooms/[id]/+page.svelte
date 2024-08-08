@@ -4,6 +4,7 @@
 
 <h1>Welcome to room '{data.roomInfo.name}'</h1>
 
+<button>Add tasks</button>
 <table style="width: 100%">
     <tr>
         <th style="width: 10%">Task no</th>
