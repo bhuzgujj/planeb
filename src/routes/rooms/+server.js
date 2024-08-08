@@ -1,6 +1,9 @@
-import {json} from "@sveltejs/kit";
+import {fail, json} from "@sveltejs/kit";
 import {createRoom} from "$lib/database.js";
 import {updateList} from "$lib/websocket.js";
+/**
+ * @typedef {import("$lib/logger.js").default}
+ */
 import logger from "$lib/logger.js";
 
 export async function POST({request}) {

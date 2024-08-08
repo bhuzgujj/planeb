@@ -1,10 +1,11 @@
 <script>
     import {onDestroy, onMount} from "svelte";
-    import * as socket from "$lib/socket.js";
+    import {listenToUpdate, stopListening} from "$lib/socket.js";
+    import {goto} from "$app/navigation";
 
     export let data;
 
-    let rooms = data.rooms
+    let rooms = data.rooms;
 
     /**
      * @param {string} id
@@ -18,7 +19,7 @@
     }
 
     /**
-     * @param {ListEvent} update
+     * @param {any} update
      */
     function onServerUpdate(update) {
         if (update.type === "remove" && rooms.has(update.id)) {
@@ -30,11 +31,11 @@
     }
 
     onMount(() => {
-        socket.listenToUpdate(onServerUpdate, "list")
+        listenToUpdate(onServerUpdate, "list")
     })
 
     onDestroy(() => {
-        socket.stopListening(onServerUpdate)
+        stopListening(onServerUpdate)
     })
 </script>
 
@@ -53,10 +54,8 @@
                     Delete
                 </button>
             </td>
-            <td style="width: 100%; vertical-align: center; padding-left: 10px">
-                <a href="/rooms/{id}" style="width: 100%">
-                    Room: {rooms.get(id)?.name}
-                </a>
+            <td style="width: 100%; vertical-align: center; padding-left: 10px" on:click={() => goto(`/rooms/${id}`)}>
+                Room: {rooms.get(id)?.name}
             </td>
         </tr>
     {/each}

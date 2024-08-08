@@ -4,6 +4,23 @@ import logger from "$lib/logger.js";
 import {DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
 
+/**
+ * @typedef {{
+ *     name: string;
+ *     isPersisted: boolean;
+ * }} RoomInfo
+ * @typedef {{
+ *    name: string;
+ *    vote: string;
+ * }} UserInfo
+ * @typedef {{
+ *    no: string;
+ *    name: string;
+ *    vote: string;
+ * }} TaskInfo
+ * @typedef {"init" | "create_room"} Query
+ */
+
 /** @type {Map<string, RoomInfo>} */
 let rooms = new Map()
 let roomFolder = ""
@@ -12,37 +29,31 @@ let roomFolder = ""
  * Execute a query on a database
  * @param {string} path
  * @param {Query} query
- * @param {((db: Database) => void)?} dataFiller
+ * @param {((db: any) => void) | null} dataFiller
  * @return {Promise<void>}
  */
-function executeQuery(path, query, dataFiller) {
+async function executeQuery(path, query, dataFiller) {
     logger.debug(`Initializing database...`);
     let sql = queries.readQuery(query);
-    return new Promise((resolve, reject) => {
-        try {
-            let db = new Database(path);
-            db.exec(sql)
-            if (dataFiller) {
-                dataFiller(db)
-            }
-            resolve(db);
-        } catch (e) {
-            reject(e)
+    /**
+     * @type {any}
+     */
+    let db
+    try {
+        db = new Database(path);
+        db.exec(sql)
+        if (dataFiller) {
+            dataFiller(db)
         }
-    })
-        .then((db) => {
-            logger.debug("Database initialized!")
-            return db
-        })
-        .catch(err => {
-            logger.error("Failed to initialize database...");
-            logger.error(err)
-        })
-        .finally(db => {
-            if (db) {
-                db.close()
-            }
-        })
+    } catch (e) {
+        logger.debug(e)
+        throw e
+    } finally {
+        if (db) {
+            db.close()
+        }
+    }
+    return db
 }
 
 /**
@@ -87,7 +98,7 @@ export function init(folder, rooms, masterDb) {
     } catch (e) {
         logger.error(`Could not read folder ${roomFolder}`)
     }
-    executeQuery(`${folder}/${masterDb}`, "init").catch(logger.error)
+    executeQuery(`${folder}/${masterDb}`, "init", null).catch(logger.error)
 }
 
 /**
@@ -99,16 +110,18 @@ export function init(folder, rooms, masterDb) {
 export async function createRoom(name, isPersisted) {
     const roomId = crypto.randomUUID();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
-    return executeQuery(dbPath, "create_room", db => {
-        const prep = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
-        prep.run("name", name);
-        prep.run("is_persisted", isPersisted);
-    })
-        .then(() => {
-            rooms.set(roomId, { name: name, isPersisted: isPersisted });
-            return roomId
+    try {
+        await executeQuery(dbPath, "create_room", db => {
+            const prep = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
+            prep.run("name", name);
+            prep.run("is_persisted", isPersisted);
         })
-        .catch(logger.error)
+        rooms.set(roomId, { name: name, isPersisted: isPersisted });
+        return roomId.toString()
+    } catch (e) {
+        logger.error(e)
+        return roomId.toString()
+    }
 }
 
 /**
@@ -119,16 +132,29 @@ export function getRooms() {
     return rooms;
 }
 
+/**
+ * Get room by id
+ * @param {string} id
+ * @return {{id: string, users: UserInfo[], tasks: TaskInfo[], roomInfo: RoomInfo}|null}
+ */
 export function getRoomsById(id) {
     if (!rooms.has(id))
         return null
+    const roomInfo = rooms.get(id);
+    if (!roomInfo)
+        return null
     return {
-        id: id,
-        roomInfo: rooms.get(id),
+        id,
+        roomInfo,
+        users: [],
         tasks: []
     };
 }
 
+/**
+ * Delete a db
+ * @param {string} id
+ */
 export function deleteRoomById(id) {
     if (rooms.has(id)) {
         rooms.delete(id)
@@ -136,6 +162,10 @@ export function deleteRoomById(id) {
     }
 }
 
+/**
+ * Physically delete a db
+ * @param {string} id
+ */
 function deleteRoom(id) {
     fs.unlink(`${roomFolder}/${id}.db`, err => {
         if (err) {

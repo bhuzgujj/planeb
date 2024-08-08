@@ -11,7 +11,7 @@ function start() {
     }
     started = true;
 
-    logger.init({ level: "debug" })
+    logger.init({ level: "debug", showOrigin: true })
     db.init(DATABASE_FOLDER, "rooms", DATABASE);
     websocket.init()
     process.on('SIGINT', shutdown);

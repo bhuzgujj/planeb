@@ -1,10 +1,65 @@
+<script>
+    import {onMount} from "svelte";
+
+    let name = ""
+
+    /**
+     * @param {any} evt
+     */
+    function nameChange(evt) {
+        if (evt.key === "Enter") {
+            let userId = localStorage.getItem("planeb.id")
+            if (userId) {
+                fetch(`/users/${userId}`, {
+                    method: "PUT",
+                    body: JSON.stringify({
+                        name: name
+                    })
+                })
+                    .then(() => {
+                        localStorage.setItem("planeb.name", name)
+                    })
+            } else {
+                console.error("No userid found in localStorage, key looked is:" + "planeb.id")
+            }
+            fetch(`/users/`)
+        }
+    }
+
+    onMount(()=>{
+        name = localStorage.getItem("planeb.name") ?? ""
+    })
+</script>
+
+
 <nav>
-    <a href="/">Home</a>
-    <a href="/rooms">Rooms</a>
+    <div style="height: 100%; flex-grow: 1">
+        <a href="/">Home</a>
+        <a href="/rooms">Rooms</a>
+    </div>
+    <label>
+        Name: <input type="text" style="padding: 0; margin: 0;" on:keypress={(e) => nameChange(e)} bind:value={name}/>
+    </label>
 </nav>
 
 <div class="fcenter">
     <div class="fcol">
-        <slot />
+        <slot/>
     </div>
 </div>
+
+<style>
+    a:hover {
+        transition: 100ms;
+        background: #555555;
+    }
+
+    a {
+        vertical-align: center;
+        padding: 2px 2rem;
+        border: solid 1px #555555;
+        margin: 5px;
+        border-radius: 5px;
+        text-decoration: none;
+    }
+</style>

@@ -22,8 +22,14 @@
 
 			nav {
 				display: flex;
-				justify-content: center;
 				background: #222222;
+				padding: 10px;
+			}
+
+			nav > * {
+				background: #222222;
+				padding: 0;
+				margin: 0;
 			}
 
 			/* Classes */
@@ -68,30 +74,36 @@
 			}
 
 			/* Anchor */
-			nav > a:hover {
-				transition: 100ms;
-				background: #555555;
-			}
-
-			nav > a {
-				padding: 2px 2rem;
-				border: solid 1px #555555;
-				margin: 5px;
-				border-radius: 5px;
-				text-decoration: none;
-			}
-
 			a {
 				text-decoration: none;
 			}
 
 			/* Tables */
+			table {
+				border: solid 1px #555555;
+			}
+
 			th {
 				text-align: start;
+				margin: 0;
 			}
 
 			tr {
 				text-align: start;
+			}
+
+			tr:nth-child(even) {
+				background-color: #222222;
+			}
+
+			tr:hover {
+				transition: 200ms;
+				background: #999999;
+			}
+
+			tr:hover > td {
+				transition: 200ms;
+				background: #999999;
 			}
 		</style>
 	</head>

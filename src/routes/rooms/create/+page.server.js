@@ -7,9 +7,7 @@ export const actions = {
         let persisted = data.get("persisted");
         if (!name) {
             return fail(400, {
-                name: {
-                    missing: true
-                }
+                nameError: "Require a room name"
             })
         } else {
             return {
