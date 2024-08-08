@@ -12,4 +12,3 @@ export type RoomEvent = {
     id: string,
     room: RoomInfo
 }
-export type EventListener<T> = (event: T) => void

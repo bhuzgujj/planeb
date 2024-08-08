@@ -14,39 +14,46 @@ function init() {
         port: 43594
     })
     new Promise((resolve, reject) => {
-        socket.on("connection", (ws, req) => {
-            const ip = req.socket.remoteAddress;
-            connectionsPool.set(ip, {
-                socket: ws,
-                focused: null,
-                listed: false
+        try {
+            socket.on("connection", (ws, req) => {
+                const id = crypto.randomUUID();
+                connectionsPool.set(id, {
+                    socket: ws,
+                    focused: null,
+                    listed: false
+                })
+                logger.debug(`Connection from ${ req.socket.remoteAddress}`)
+                ws.on("message", onMessage(id))
+                ws.on("close", onClose(id))
+                ws.on("error", onErr(id))
             })
-            logger.debug(`Connection from ${ip}`)
-            ws.on("message", onMessage(ip))
-            ws.on("close", onClose(ip))
-            ws.on("error", onErr(ip))
-        })
-        resolve()
+            resolve("Websocket initialized")
+
+        } catch (e) {
+            reject(e)
+        }
     })
+        .then(logger.debug)
+        .catch(logger.error)
 }
 
-function onMessage(ip) {
+function onMessage(id) {
     return (data) => {
         const item = JSON.parse(data)
-        logger.debug(`Message received from ${ip} ${data}`)
+        logger.debug(`Message received from ${id} ${data}`)
         if (item.focused) {
-            connectionsPool.get(ip).focused = item.focused
+            connectionsPool.get(id).focused = item.focused
         }
         if (item.listed !== undefined || item.listed !== null) {
-            connectionsPool.get(ip).listed = item.listed
+            connectionsPool.get(id).listed = item.listed
         }
     }
 }
 
-function onClose(ip) {
+function onClose(id) {
     return (data) => {
-        logger.debug(`Closing socket for ip ${ip}`);
-        connectionsPool.delete(ip)
+        logger.debug(`Closing socket for ip ${id}`);
+        connectionsPool.delete(id)
     }
 }
 

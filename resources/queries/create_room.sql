@@ -7,7 +7,7 @@ create table users(
 create table tasks(
     id integer primary key asc,
     names text not null,
-    task text default null,
+    comments text default null,
     points_selected text default null
 );
 

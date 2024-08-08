@@ -4,7 +4,7 @@ import logger from "$lib/logger.js";
 import {DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
 
-/** @type {Map<string, Rooms>} */
+/** @type {Map<string, RoomInfo>} */
 let rooms = new Map()
 let roomFolder = ""
 
@@ -53,11 +53,14 @@ function executeQuery(path, query, dataFiller) {
 function fillState(dir, fileName) {
     if (!fileName.endsWith(".db"))
         return
+    logger.debug(`Room found: ${dir}/${fileName}`)
     let db = new Database(`${dir}/${fileName}`)
     let prep = db.prepare("select * from metadatas where keys = ?")
     let name = prep.get("name")
     let presisted = prep.get("is_persisted")
+    db.close()
     if (!presisted || !presisted?.vals) {
+        logger.debug(`Deleting room: ${dir}/${fileName}`)
         fs.unlink(`${dir}/${fileName}`, logger.error)
     } else {
         rooms.set(fileName.substring(0, fileName.length - 3), { name: name.vals, isPersisted: presisted?.vals });
@@ -72,19 +75,17 @@ function fillState(dir, fileName) {
  */
 export function init(folder, rooms, masterDb) {
     logger.debug("Starting database...");
-    logger.debug(JSON.stringify({folder, rooms, masterDb}));
     roomFolder = `${folder}/${rooms}`;
     try {
-        fs.mkdirSync(folder)
-        fs.mkdirSync(roomFolder)
+        fs.mkdirSync(roomFolder, { recursive: true });
     } catch (e) {
-        logger.debug(e)
+        logger.debug(`Could not create folder ${roomFolder}`)
     }
 
     try {
         fs.readdirSync(roomFolder).forEach(file => fillState(roomFolder, file));
     } catch (e) {
-        logger.debug(e)
+        logger.error(`Could not read folder ${roomFolder}`)
     }
     executeQuery(`${folder}/${masterDb}`, "init").catch(logger.error)
 }
@@ -112,7 +113,7 @@ export async function createRoom(name, isPersisted) {
 
 /**
  * Get all rooms
- * @return {Map<string, Rooms>}
+ * @return {Map<string, RoomInfo>}
  */
 export function getRooms() {
     return rooms;
