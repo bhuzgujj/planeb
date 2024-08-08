@@ -1,2 +1,5 @@
-# planeb
-Helper for refinements
+# Plan-Eb
+A tool to help refinements
+
+## To use
+TODO
