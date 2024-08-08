@@ -1,0 +1,1 @@
+export type LoggingLevel = "error" | "info" | "warn" | "debug" | "none";
