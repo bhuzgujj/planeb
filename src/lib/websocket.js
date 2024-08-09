@@ -2,38 +2,28 @@ import {WebSocketServer} from "ws";
 import logger from "$lib/logger.js";
 
 /**
- * @typedef {{
- *     name: string;
- *     isPersisted: boolean;
- * }} RoomInfo
- * @typedef {{
- *     type: UpdateType,
- *     id: string,
- *     room: RoomInfo | null
- * }} ListEvent
- * @typedef {{
- *     type: UpdateType,
- *     id: string,
- *     room: RoomInfo
- * }} RoomEvent
- * @typedef {"list" | "room"} ListenerType
- * @typedef {"add" | "update" | "remove"} UpdateType
+ * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
+ * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
+ * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomEvent
+ * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
  */
 
 /** @type {WebSocketServer | null} */
 let socket = null;
-/** @type {Map<string, {socket: any, focused: Array<string>, listed: boolean}>} */
+/** @type {Map<string, {socket: any, focused: Set<string>, listed: boolean}>} */
 const connectionsPool = new Map();
 
 function init() {
-    logger.debug("Initializing websocket...")
-    if (socket != null) {
+    if (socket) {
         return
     }
+    logger.debug("Initializing websocket...")
     socket = new WebSocketServer({
         port: 43594
     })
-    new Promise((resolve, reject) => {
+    /** @type {Promise<void>} */
+    const creation = new Promise((resolve, reject) => {
         if (!socket)
             throw new Error("WebSocket not initialized");
         try {
@@ -41,7 +31,7 @@ function init() {
                 const id = crypto.randomUUID();
                 connectionsPool.set(id, {
                     socket: ws,
-                    focused: [],
+                    focused: new Set(),
                     listed: false
                 })
                 logger.debug(`Connection from ${ req.socket.remoteAddress}`)
@@ -49,20 +39,20 @@ function init() {
                 ws.on("close", onClose(id))
                 ws.on("error", onError(id))
             })
-            resolve("Websocket initialized")
+            logger.debug("Websocket initialized")
+            resolve()
 
         } catch (e) {
             reject(e)
         }
     })
-        .then(logger.debug)
-        .catch(logger.error)
+    creation.catch(logger.error)
 }
 
 /**
  * When receiving a message, execute this
  * @param {string} id
- * @return {(data: any) => void}
+ * @return {(data: string) => void}
  */
 function onMessage(id) {
     return (data) => {
@@ -73,7 +63,7 @@ function onMessage(id) {
         const item = JSON.parse(data)
         logger.debug(`Message received from ${id} ${data}`)
         if (item.focused) {
-            connection.focused = item.focused
+            connection.focused.add(item.focused)
         }
         if (item.listed !== undefined || item.listed !== null) {
             connection.listed = item.listed
@@ -82,9 +72,9 @@ function onMessage(id) {
 }
 
 /**
- * If a socket closes, it execute this function
+ * If a socket closes, it executes this function
  * @param {string} id
- * @return {(data: any) => void}
+ * @return {(data: string) => void}
  */
 function onClose(id) {
     return (data) => {
@@ -96,7 +86,7 @@ function onClose(id) {
 /**
  * If a socket error, it execute this function
  * @param {string} id
- * @return {(data: any) => void}
+ * @return {(data: string) => void}
  */
 function onError(id) {
     return (data) => {
@@ -123,7 +113,7 @@ export function updateList(evt, type) {
                 }
                 break
             case "room":
-                if (connection.focused.includes(evt.id)) {
+                if (connection.focused.has(evt.id)) {
 
                 }
                 break

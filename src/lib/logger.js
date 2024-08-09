@@ -50,12 +50,21 @@ function log(msg, lvl) {
         return
     }
     if (logging >= loggedLevel) {
+        let message;
+        if (typeof msg === 'string') {
+            message = msg;
+        } else {
+            message = JSON.stringify(msg)
+        }
         const time = new Date().toISOString()
         if (showOrigin) {
-            const path = (new Error()).stack?.split("\n")[3]?.trim()
-            logs(`(${time}) [${lvl}] ${path}: ${msg}`, loggedLevel);
+            let path = (new Error()).stack?.split("\n")[3]?.trim()
+            if (path) {
+                path = path.split("(")[1].split(")")[0]
+            }
+            logs(`(${time}) [${lvl}] ${path}: ${message}`, loggedLevel);
         } else {
-            logs(`(${time}) [${lvl}] ${msg}`, loggedLevel);
+            logs(`(${time}) [${lvl}] ${message}`, loggedLevel);
         }
     }
 }

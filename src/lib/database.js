@@ -5,19 +5,10 @@ import {DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
 
 /**
- * @typedef {{
- *     name: string;
- *     isPersisted: boolean;
- * }} RoomInfo
- * @typedef {{
- *    name: string;
- *    vote: string;
- * }} UserInfo
- * @typedef {{
- *    no: string;
- *    name: string;
- *    vote: string;
- * }} TaskInfo
+ * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/data.d.ts').UserInfo} UserInfo
+ * @typedef {import('$lib/data.d.ts').TaskInfo} TaskInfo
+ * @typedef {import('$lib/data.d.ts').DbUser} DbUser
  * @typedef {"init" | "create_room"} Query
  */
 
@@ -45,15 +36,12 @@ async function executeQuery(path, query, dataFiller) {
         if (dataFiller) {
             dataFiller(db)
         }
+        db.close()
     } catch (e) {
         logger.debug(e)
+        db.close()
         throw e
-    } finally {
-        if (db) {
-            db.close()
-        }
     }
-    return db
 }
 
 /**
@@ -66,15 +54,28 @@ function fillState(dir, fileName) {
         return
     logger.debug(`Room found: ${dir}/${fileName}`)
     let db = new Database(`${dir}/${fileName}`)
-    let prep = db.prepare("select * from metadatas where keys = ?")
-    let name = prep.get("name")
-    let presisted = prep.get("is_persisted")
-    db.close()
-    if (!presisted || !presisted?.vals) {
-        logger.debug(`Deleting room: ${dir}/${fileName}`)
+    try {
+        let prep = db.prepare("select * from metadatas where keys = ?")
+        let name = prep.get("name")
+        let presisted = prep.get("is_persisted")
+        let owner = prep.get("owner")
+        db.close()
+        if (!presisted || !presisted?.vals) {
+            logger.debug(`Deleting room: ${dir}/${fileName}`)
+            fs.unlink(`${dir}/${fileName}`, logger.error)
+        } else {
+            rooms.set(fileName.substring(0, fileName.length - 3), {
+                name: name.vals,
+                isPersisted: presisted?.vals,
+                owner: owner?.vals ?? ""
+            });
+        }
+    } catch (e) {
+        if (db) {
+            db.close()
+        }
+        logger.error(`Could not read db ${roomFolder}/${fileName}: ${e}` );
         fs.unlink(`${dir}/${fileName}`, logger.error)
-    } else {
-        rooms.set(fileName.substring(0, fileName.length - 3), { name: name.vals, isPersisted: presisted?.vals });
     }
 }
 
@@ -94,9 +95,10 @@ export function init(folder, rooms, masterDb) {
     }
 
     try {
-        fs.readdirSync(roomFolder).forEach(file => fillState(roomFolder, file));
+        fs.readdirSync(roomFolder)
+            .forEach(file => fillState(roomFolder, file));
     } catch (e) {
-        logger.error(`Could not read folder ${roomFolder}`)
+        logger.error(`Could not read folder ${roomFolder}: ${e}`)
     }
     executeQuery(`${folder}/${masterDb}`, "init", null).catch(logger.error)
 }
@@ -105,18 +107,22 @@ export function init(folder, rooms, masterDb) {
  * Create a room
  * @param {string} name
  * @param {boolean} isPersisted
+ * @param {{id: string, name: string}}moderator
  * @return {Promise<string>}
  */
-export async function createRoom(name, isPersisted) {
+export async function createRoom(name, isPersisted, moderator) {
     const roomId = crypto.randomUUID();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
         await executeQuery(dbPath, "create_room", db => {
-            const prep = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
-            prep.run("name", name);
-            prep.run("is_persisted", isPersisted);
+            const md = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
+            md.run("name", name);
+            md.run("is_persisted", isPersisted);
+            md.run("owner", moderator.id);
+            const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 1);")
+            mod.run(moderator.id, moderator.name);
         })
-        rooms.set(roomId, { name: name, isPersisted: isPersisted });
+        rooms.set(roomId, { name: name, isPersisted: isPersisted, owner: moderator.id });
         return roomId.toString()
     } catch (e) {
         logger.error(e)
@@ -138,28 +144,56 @@ export function getRooms() {
  * @return {{id: string, users: UserInfo[], tasks: TaskInfo[], roomInfo: RoomInfo}|null}
  */
 export function getRoomsById(id) {
-    if (!rooms.has(id))
-        return null
     const roomInfo = rooms.get(id);
     if (!roomInfo)
         return null
-    return {
-        id,
-        roomInfo,
-        users: [],
-        tasks: []
-    };
+    let dbPath = `${DATABASE_FOLDER}/rooms/${id}.db`;
+    const db = new Database(dbPath)
+    try {
+        /** @type {Array<UserInfo>} */
+        let users = [];
+        for (const /** @type {DbUser} */ user of db.prepare("select * from users;").iterate()) {
+            users.push({
+                id: user.id,
+                name: user.names,
+                moderator: !!user.moderator,
+                vote: undefined
+            })
+        }
+        /** @type {Array<TaskInfo>} */
+        let tasks = [];
+        for (const task of db.prepare("select * from tasks;").iterate()) {
+            users.push(task)
+        }
+        logger.debug(users)
+        db.close()
+        return {
+            id,
+            roomInfo,
+            users,
+            tasks
+        };
+    } catch (e) {
+        logger.error(e)
+        if (db) {
+            db.close()
+        }
+        throw e;
+    }
 }
 
 /**
  * Delete a db
  * @param {string} id
+ * @return {RoomInfo | undefined}
  */
 export function deleteRoomById(id) {
-    if (rooms.has(id)) {
+    let roomDeleted = rooms.get(id);
+    if (roomDeleted) {
         rooms.delete(id)
         deleteRoom(id);
     }
+    return roomDeleted
 }
 
 /**

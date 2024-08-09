@@ -1,5 +1,6 @@
 <script>
     import {onMount} from "svelte";
+    import ls from "../constant.js";
 
     let name = ""
 
@@ -8,7 +9,7 @@
      */
     function nameChange(evt) {
         if (evt.key === "Enter") {
-            let userId = localStorage.getItem("planeb.id")
+            let userId = localStorage.getItem(ls.itemKeys.id)
             if (userId) {
                 fetch(`/users/${userId}`, {
                     method: "PUT",
@@ -17,7 +18,7 @@
                     })
                 })
                     .then(() => {
-                        localStorage.setItem("planeb.name", name)
+                        localStorage.setItem(ls.itemKeys.name, name)
                     })
             } else {
                 console.error("No userid found in localStorage, key looked is:" + "planeb.id")
@@ -27,7 +28,7 @@
     }
 
     onMount(()=>{
-        name = localStorage.getItem("planeb.name") ?? ""
+        name = localStorage.getItem(ls.itemKeys.name) ?? ""
     })
 </script>
 

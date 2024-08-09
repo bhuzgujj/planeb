@@ -1,6 +1,7 @@
 <script>
     import {enhance} from '$app/forms';
     import {goto} from "$app/navigation";
+    import ls from "../../../constant.js";
 
     /** @type {import('./$types').ActionData} */
     export let form;
@@ -11,11 +12,17 @@
         use:enhance={(res) => {
                 return async ({ result }) => {
                     if (result.type === 'success' && result?.data?.location) {
+                        const moderatorId = localStorage.getItem(ls.itemKeys.id)
+                        const moderatorName = localStorage.getItem(ls.itemKeys.name)
                         await fetch("/rooms", {
                             method: "POST",
                             body: JSON.stringify({
                                 name: result?.data?.name,
-                                persisted: result?.data?.persisted
+                                persisted: result?.data?.persisted,
+                                moderator: {
+                                    id: moderatorId,
+                                    name: moderatorName,
+                                }
                             })
                         })
                         await goto(result?.data?.location.toString());

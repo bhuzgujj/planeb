@@ -61,6 +61,11 @@
 				background: #990000;
 			}
 
+			.bdel:active {
+				background: #880000;
+				border: solid 1px #880000;
+			}
+
 			/* Button */
 			button {
 				padding: 2px 2rem;
@@ -71,6 +76,22 @@
 			button:hover {
 				transition: 100ms;
 				background: #555555;
+			}
+
+			button:disabled {
+				background: #222222;
+				color: #444444;
+				border: solid 1px #444444;
+			}
+
+			button:disabled:hover {
+				transition: 100ms;
+				background: #222222;
+			}
+
+			button:disabled:active {
+				background: #151515;
+				border: solid 1px #444444;
 			}
 
 			/* Anchor */

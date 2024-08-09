@@ -1,29 +1,24 @@
 /**
- * @typedef {{
- *     name: string;
- *     isPersisted: boolean;
- * }} RoomInfo
- * @typedef {{
- *     type: UpdateType,
- *     id: string,
- *     room: RoomInfo | null
- * }} ListEvent
- * @typedef {{
- *     type: UpdateType,
- *     id: string,
- *     room: RoomInfo
- * }} RoomEvent
- * @typedef {"list" | "room"} ListenerType
- * @typedef {"add" | "update" | "remove"} UpdateType
+ * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ *
+ * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
+ * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
+ * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomModificationEvent
+ * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
+ *
+ * @typedef {((evt: ListEvent) => void) | ((evt: RoomModificationEvent) => void)} NetCallback
+ * @typedef {{listed?: boolean, focused?: string, type: ListenerType}} SubscribeMessage
  */
 
 /** @type {WebSocket | null} */
 let socket;
-/** @type {Array<{listener: (evt: ListEvent | RoomEvent) => void, type: ListenerType}>} */
+/** @type {Array<{listener: NetCallback, type: ListenerType}>} */
 let listeners = []
 
-export function init() {
-    if (socket) return
+function init() {
+    if (socket) {
+        return
+    }
     socket = new WebSocket("ws://localhost:43594/");
     socket.onopen = () => {
         if (!socket)
@@ -38,26 +33,35 @@ export function init() {
                 }
             }
         }
-
-        socket.send(JSON.stringify({
-            listed: true,
-        }))
     }
 }
 
 /**
- *
- * @param {(evt: ListEvent | RoomEvent) => void} listener
- * @param {ListenerType} type
+ * @param {NetCallback} listener
+ * @param {SubscribeMessage} subMsg
  */
-export function listenToUpdate(listener, type) {
-    listeners.push({listener, type})
+function listenToUpdate(listener, subMsg) {
+    listeners.push({listener, type: subMsg.type})
+
+    if (socket) {
+        socket.send(JSON.stringify(subMsg))
+    }
 }
 
 /**
- *
- * @param {(evt: ListEvent | RoomEvent) => void} listener
+ * @param {NetCallback} listener
+ * @param {SubscribeMessage} subMsg
  */
-export function stopListening(listener) {
+function stopListening(listener, subMsg) {
     listeners = listeners.filter((l) => l.listener !== listener)
+
+    if (socket) {
+        socket.send(JSON.stringify(subMsg))
+    }
+}
+
+export default {
+    init,
+    listenToUpdate,
+    stopListening,
 }

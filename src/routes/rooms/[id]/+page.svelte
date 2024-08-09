@@ -1,8 +1,21 @@
 <script>
+    import ls from "../../../constant.js";
+    import {onMount} from "svelte";
+
     export let data;
 
+    /** @type {string} */
+    let userId = ""
+    /** @type {boolean} */
+    let isMod = false
+    /** @type {Array<import('$lib/data.d.ts').UserInfo>} */
     let users = data.users
     let tasks = data.tasks
+
+    onMount(() => {
+        userId = localStorage.getItem(ls.itemKeys.id) ?? ""
+        isMod = users.filter(u => u.id === userId && u.moderator).length >= 1
+    })
 </script>
 
 <h1>Welcome to room '{data.roomInfo.name}'</h1>
@@ -16,8 +29,8 @@
         {#if users.length > 0}
             {#each users as user}
                 <tr>
-                    <td>{user.name}</td>
-                    <td>{user.vote}</td>
+                    <td style="width: 80%">{user.name}</td>
+                    <td style="text-align: center">{user.vote ?? '?'}</td>
                 </tr>
             {/each}
         {:else}
@@ -28,7 +41,7 @@
     </table>
 </div>
 
-<button>Add tasks</button>
+<button disabled={!isMod}>Add tasks</button>
 <table style="width: 100%">
     <tr>
         <th style="width: 10%">Task no</th>
@@ -40,7 +53,7 @@
             <tr>
                 <td>{task.no}</td>
                 <td>{task.name}</td>
-                <td>{task.vote}</td>
+                <td style="text-align: center">{task.vote ?? '?'}</td>
             </tr>
         {/each}
     {:else}

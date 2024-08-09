@@ -1,4 +1,4 @@
-import {fail, json} from "@sveltejs/kit";
+import {json} from "@sveltejs/kit";
 import {createRoom} from "$lib/database.js";
 import {updateList} from "$lib/websocket.js";
 /**
@@ -8,14 +8,19 @@ import logger from "$lib/logger.js";
 
 export async function POST({request}) {
     const body = await request.json()
-    logger.debug(`Adding new room ${JSON.stringify({name: body.name, persisted: body.persisted})}`);
-    let id = await createRoom(body.name, body.persisted);
+    logger.debug(`Adding new room ${JSON.stringify({
+        name: body.name, 
+        persisted: body.persisted, 
+        moderator: body.moderator
+    })}`);
+    let id = await createRoom(body.name, body.persisted, body.moderator);
     updateList({
-        type: "add",
+        action: "add",
         id,
-        room: {
+        evt: {
             name: body.name,
-            isPersisted: body.persisted
+            isPersisted: body.persisted,
+            owner: body.moderator.id
         }
     }, "list")
     return json({
