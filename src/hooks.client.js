@@ -1,4 +1,5 @@
-import {init} from "$lib/socket.js";
+import socket from "$lib/socket.js";
+import ls from "./constant.js";
 
 let started = false;
 
@@ -9,10 +10,10 @@ function start() {
     started = true;
     console.log("Starting");
 
-    if (!localStorage.getItem("planeb.id")) {
-        localStorage.setItem("planeb.id", crypto.randomUUID().toString())
+    if (!localStorage.getItem(ls.itemKeys.id)) {
+        localStorage.setItem(ls.itemKeys.id, crypto.randomUUID().toString())
     }
-    init()
+    socket.init()
     console.log("Started");
 }
 

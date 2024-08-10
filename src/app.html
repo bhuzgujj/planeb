@@ -22,8 +22,14 @@
 
 			nav {
 				display: flex;
-				justify-content: center;
 				background: #222222;
+				padding: 10px;
+			}
+
+			nav > * {
+				background: #222222;
+				padding: 0;
+				margin: 0;
 			}
 
 			/* Classes */
@@ -55,6 +61,11 @@
 				background: #990000;
 			}
 
+			.bdel:active {
+				background: #880000;
+				border: solid 1px #880000;
+			}
+
 			/* Button */
 			button {
 				padding: 2px 2rem;
@@ -67,31 +78,61 @@
 				background: #555555;
 			}
 
-			/* Anchor */
-			nav > a:hover {
+			button:disabled {
+				background: #222222;
+				color: #444444;
+				border: solid 1px #444444;
+			}
+
+			button:disabled:hover {
 				transition: 100ms;
-				background: #555555;
+				background: #222222;
 			}
 
-			nav > a {
-				padding: 2px 2rem;
-				border: solid 1px #555555;
-				margin: 5px;
-				border-radius: 5px;
-				text-decoration: none;
+			button:disabled:active {
+				background: #151515;
+				border: solid 1px #444444;
 			}
 
+			/* Anchor */
 			a {
 				text-decoration: none;
 			}
 
 			/* Tables */
+			table {
+				border: solid 1px #555555;
+			}
+
 			th {
 				text-align: start;
+				margin: 0;
 			}
 
 			tr {
 				text-align: start;
+			}
+
+			tr:nth-child(even) {
+				background-color: #222222;
+			}
+
+			tr:hover {
+				transition: 200ms;
+				background: #666666;
+			}
+
+			tr:hover > td {
+				transition: 200ms;
+				background: #666666;
+			}
+
+			tr:hover:active {
+				background: #bbbbbb;
+			}
+
+			tr:hover:active > td {
+				background: #bbbbbb;
 			}
 		</style>
 	</head>

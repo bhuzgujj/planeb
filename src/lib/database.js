@@ -4,7 +4,15 @@ import logger from "$lib/logger.js";
 import {DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
 
-/** @type {Map<string, Rooms>} */
+/**
+ * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/data.d.ts').UserInfo} UserInfo
+ * @typedef {import('$lib/data.d.ts').TaskInfo} TaskInfo
+ * @typedef {import('$lib/data.d.ts').DbUser} DbUser
+ * @typedef {"init" | "create_room"} Query
+ */
+
+/** @type {Map<string, RoomInfo>} */
 let rooms = new Map()
 let roomFolder = ""
 
@@ -12,37 +20,27 @@ let roomFolder = ""
  * Execute a query on a database
  * @param {string} path
  * @param {Query} query
- * @param {((db: Database) => void)?} dataFiller
+ * @param {((db: any) => void) | null} dataFiller
  * @return {Promise<void>}
  */
-function executeQuery(path, query, dataFiller) {
-    logger.debug(`Initializing database...`);
+async function executeQuery(path, query, dataFiller) {
     let sql = queries.readQuery(query);
-    return new Promise((resolve, reject) => {
-        try {
-            let db = new Database(path);
-            db.exec(sql)
-            if (dataFiller) {
-                dataFiller(db)
-            }
-            resolve(db);
-        } catch (e) {
-            reject(e)
+    /**
+     * @type {any}
+     */
+    let db
+    try {
+        db = new Database(path);
+        db.exec(sql)
+        if (dataFiller) {
+            dataFiller(db)
         }
-    })
-        .then((db) => {
-            logger.debug("Database initialized!")
-            return db
-        })
-        .catch(err => {
-            logger.error("Failed to initialize database...");
-            logger.error(err)
-        })
-        .finally(db => {
-            if (db) {
-                db.close()
-            }
-        })
+        db.close()
+    } catch (e) {
+        logger.warn(e)
+        db.close()
+        throw e
+    }
 }
 
 /**
@@ -53,14 +51,30 @@ function executeQuery(path, query, dataFiller) {
 function fillState(dir, fileName) {
     if (!fileName.endsWith(".db"))
         return
+    logger.debug(`Room found: ${dir}/${fileName}`)
     let db = new Database(`${dir}/${fileName}`)
-    let prep = db.prepare("select * from metadatas where keys = ?")
-    let name = prep.get("name")
-    let presisted = prep.get("is_persisted")
-    if (!presisted || !presisted?.vals) {
+    try {
+        let prep = db.prepare("select * from metadatas where keys = ?")
+        let name = prep.get("name")
+        let presisted = prep.get("is_persisted")
+        let owner = prep.get("owner")
+        db.close()
+        if (!presisted || !presisted?.vals) {
+            logger.debug(`Deleting room: ${dir}/${fileName}`)
+            fs.unlink(`${dir}/${fileName}`, logger.error)
+        } else {
+            rooms.set(fileName.substring(0, fileName.length - 3), {
+                name: name.vals,
+                isPersisted: presisted?.vals,
+                owner: owner?.vals ?? ""
+            });
+        }
+    } catch (e) {
+        if (db) {
+            db.close()
+        }
+        logger.error(`Could not read db ${roomFolder}/${fileName}: ${e}` );
         fs.unlink(`${dir}/${fileName}`, logger.error)
-    } else {
-        rooms.set(fileName.substring(0, fileName.length - 3), { name: name.vals, isPersisted: presisted?.vals });
     }
 }
 
@@ -72,69 +86,156 @@ function fillState(dir, fileName) {
  */
 export function init(folder, rooms, masterDb) {
     logger.debug("Starting database...");
-    logger.debug(JSON.stringify({folder, rooms, masterDb}));
     roomFolder = `${folder}/${rooms}`;
     try {
-        fs.mkdirSync(folder)
-        fs.mkdirSync(roomFolder)
+        fs.mkdirSync(roomFolder, { recursive: true });
     } catch (e) {
-        logger.debug(e)
+        logger.debug(`Could not create folder ${roomFolder}`)
     }
 
     try {
-        fs.readdirSync(roomFolder).forEach(file => fillState(roomFolder, file));
+        fs.readdirSync(roomFolder)
+            .forEach(file => fillState(roomFolder, file));
     } catch (e) {
-        logger.debug(e)
+        logger.error(`Could not read folder ${roomFolder}: ${e}`)
     }
-    executeQuery(`${folder}/${masterDb}`, "init").catch(logger.error)
+    logger.debug(`Initializing master database...`);
+    executeQuery(`${folder}/${masterDb}`, "init", null)
+        .then(() => logger.debug(`Master database initialized`))
+        .catch(logger.error)
 }
 
 /**
  * Create a room
  * @param {string} name
  * @param {boolean} isPersisted
+ * @param {{id: string, name: string}}moderator
  * @return {Promise<string>}
  */
-export async function createRoom(name, isPersisted) {
+export async function createRoom(name, isPersisted, moderator) {
     const roomId = crypto.randomUUID();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
-    return executeQuery(dbPath, "create_room", db => {
-        const prep = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
-        prep.run("name", name);
-        prep.run("is_persisted", isPersisted);
-    })
-        .then(() => {
-            rooms.set(roomId, { name: name, isPersisted: isPersisted });
-            return roomId
+    try {
+        logger.debug(`Initializing database "${roomId}:${name}"...`);
+        await executeQuery(dbPath, "create_room", db => {
+            const md = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
+            md.run("name", name);
+            md.run("is_persisted", isPersisted);
+            md.run("owner", moderator.id);
+            const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 1);")
+            mod.run(moderator.id, moderator.name);
         })
-        .catch(logger.error)
+        logger.debug(`"${roomId}:${name}" database initialized`)
+        rooms.set(roomId, { name: name, isPersisted: isPersisted, owner: moderator.id });
+        return roomId.toString()
+    } catch (e) {
+        logger.error(`"${roomId}:${name}" database initialized: ${e}`)
+        return roomId.toString()
+    }
+}
+
+/**
+ *
+ * @param {{id: string, names: string, moderator?: boolean}} user
+ * @param {string} roomId
+ * @returns {Promise<void>}
+ */
+export async function putUserInRoom(user, roomId) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    let db;
+    try {
+        db = new Database(dbPath);
+        let users = db.prepare("select count(*) from users where id = ?;").get(user.id);
+        if (users['count(*)'] > 0) {
+            if (user.moderator) {
+                const mod = db.prepare("update users set names = ?, moderator = ? where id = ?;")
+                mod.run(user.names, user.moderator, user.id);
+            } else {
+                const mod = db.prepare("update users set names = ? where id = ?;")
+                mod.run(user.names, user.id);
+            }
+        } else {
+            const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, ?, ?);")
+            mod.run(user.id, user.names, user.moderator);
+        }
+        db.close()
+    } catch (e) {
+        if (db) {
+            db.close()
+        }
+        throw e
+    }
 }
 
 /**
  * Get all rooms
- * @return {Map<string, Rooms>}
+ * @return {Map<string, RoomInfo>}
  */
 export function getRooms() {
     return rooms;
 }
 
+/**
+ * Get room by id
+ * @param {string} id
+ * @return {{id: string, users: UserInfo[], tasks: TaskInfo[], roomInfo: RoomInfo}|null}
+ */
 export function getRoomsById(id) {
-    if (!rooms.has(id))
+    const roomInfo = rooms.get(id);
+    if (!roomInfo)
         return null
-    return {
-        id: id,
-        roomInfo: rooms.get(id),
-        tasks: []
-    };
-}
-
-export function deleteRoomById(id) {
-    if (rooms.has(id)) {
-        rooms.delete(id)
-        deleteRoom(id);
+    let dbPath = `${DATABASE_FOLDER}/rooms/${id}.db`;
+    const db = new Database(dbPath)
+    try {
+        /** @type {Array<UserInfo>} */
+        let users = [];
+        for (const /** @type {DbUser} */ user of db.prepare("select * from users;").iterate()) {
+            users.push({
+                id: user.id,
+                name: user.names,
+                moderator: !!user.moderator,
+                vote: undefined
+            })
+        }
+        /** @type {Array<TaskInfo>} */
+        let tasks = [];
+        for (const task of db.prepare("select * from tasks;").iterate()) {
+            users.push(task)
+        }
+        db.close()
+        return {
+            id,
+            roomInfo,
+            users,
+            tasks
+        };
+    } catch (e) {
+        logger.error(e)
+        if (db) {
+            db.close()
+        }
+        throw e;
     }
 }
 
+/**
+ * Delete a db
+ * @param {string} id
+ * @return {RoomInfo | undefined}
+ */
+export function deleteRoomById(id) {
+    let roomDeleted = rooms.get(id);
+    if (roomDeleted) {
+        rooms.delete(id)
+        deleteRoom(id);
+    }
+    return roomDeleted
+}
+
+/**
+ * Physically delete a db
+ * @param {string} id
+ */
 function deleteRoom(id) {
     fs.unlink(`${roomFolder}/${id}.db`, err => {
         if (err) {

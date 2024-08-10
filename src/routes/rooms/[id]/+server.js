@@ -3,11 +3,15 @@ import {json} from "@sveltejs/kit";
 import {updateList} from "$lib/websocket.js";
 
 export async function DELETE({params}) {
-    deleteRoomById(params.id);
+    let roomInfo = deleteRoomById(params.id);
+    if (!roomInfo)
+        return json({message: "Room not found"}, {
+            status: 404
+        });
     updateList({
         id: params.id,
-        type: "remove",
-        room: null
+        action: "remove",
+        evt: roomInfo
     }, "list")
     return json({
         roomDeleted: params.id

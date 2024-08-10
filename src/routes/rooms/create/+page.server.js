@@ -1,15 +1,13 @@
 import {fail} from "@sveltejs/kit";
 
 export const actions = {
-    default: async ({cookies, request}) => {
+    default: async ({request}) => {
         const data = await request.formData();
-        let name = data.get("name");
-        let persisted = data.get("persisted");
+        const name = data.get("name");
+        const persisted = data.get("persisted");
         if (!name) {
             return fail(400, {
-                name: {
-                    missing: true
-                }
+                nameError: "Require a room name"
             })
         } else {
             return {

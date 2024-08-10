@@ -1,56 +1,119 @@
 import {WebSocketServer} from "ws";
 import logger from "$lib/logger.js";
+import {putUserInRoom} from "$lib/database.js";
 
+/**
+ * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
+ * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
+ * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomEvent
+ * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
+ * @typedef {{socket: any, userId: string | undefined, focused: Set<string>, listed: boolean}} ConnectionItem
+ * @typedef {Map<string, ConnectionItem>} ConnectionPool
+ */
+
+/** @type {WebSocketServer | null} */
 let socket = null;
-/** @type {Map<string, {socket: any, focused: string | null, listed: boolean}>} */
+/** @type {ConnectionPool}>} */
 const connectionsPool = new Map();
 
 function init() {
-    logger.debug("Initializing websocket...")
-    if (socket != null) {
+    if (socket) {
         return
     }
+    logger.debug("Initializing websocket...")
     socket = new WebSocketServer({
         port: 43594
     })
-    new Promise((resolve, reject) => {
-        socket.on("connection", (ws, req) => {
-            const ip = req.socket.remoteAddress;
-            connectionsPool.set(ip, {
-                socket: ws,
-                focused: null,
-                listed: false
+    /** @type {Promise<void>} */
+    const creation = new Promise((resolve, reject) => {
+        if (!socket)
+            throw new Error("WebSocket not initialized");
+        try {
+            socket.on("connection", (ws, req) => {
+                const id = crypto.randomUUID();
+                connectionsPool.set(id, {
+                    socket: ws,
+                    userId: undefined,
+                    focused: new Set(),
+                    listed: false
+                })
+                logger.debug(`Connection from ${ req.socket.remoteAddress}`)
+                ws.on("message", onMessage(id))
+                ws.on("close", onClose(id))
+                ws.on("error", onError(id))
             })
-            logger.debug(`Connection from ${ip}`)
-            ws.on("message", onMessage(ip))
-            ws.on("close", onClose(ip))
-            ws.on("error", onErr(ip))
-        })
-        resolve()
+            logger.debug("Websocket initialized")
+            resolve()
+
+        } catch (e) {
+            reject(e)
+        }
     })
+    creation.catch(logger.error)
 }
 
-function onMessage(ip) {
+/**
+ * When receiving a message, execute this
+ * @param {string} id
+ * @return {(data: string) => void}
+ */
+function onMessage(id) {
     return (data) => {
+        /** @type {ConnectionItem | undefined} */
+        const connection = connectionsPool.get(id)
+        if (connection === undefined) {
+            return
+        }
+        /** @type {import("$lib/network.js").WebSocketRequest} */
         const item = JSON.parse(data)
-        logger.debug(`Message received from ${ip} ${data}`)
-        if (item.focused) {
-            connectionsPool.get(ip).focused = item.focused
+        logger.debug(`Message received from ${id} ${data}`)
+        if (item.focused?.id !== item.unfocused) {
+            if (item.focused) {
+                if (!connection.focused.has(item.focused.id)) {
+                    putUserInRoom({
+                        id: item.focused.user.id,
+                        names: item.focused.user.name
+                    }, item.focused.id)
+                        .then(() => {
+                            if (item.focused?.id) {
+                                connection.focused.add(item.focused?.id)
+                            }
+                        })
+                        .catch(logger.error)
+                }
+            }
+            if (item.unfocused) {
+                connection.focused.delete(item.unfocused)
+            }
         }
-        if (item.listed !== undefined || item.listed !== null) {
-            connectionsPool.get(ip).listed = item.listed
+        if (item.listed !== undefined) {
+            connection.listed = item.listed
+        }
+        if (item.userId !== undefined) {
+            connection.userId = item.userId
         }
     }
 }
 
-function onClose(ip) {
+/**
+ * If a socket closes, it executes this function
+ * @param {string} id
+ * @return {(data: string) => void}
+ */
+function onClose(id) {
     return (data) => {
-        logger.debug(`Closing socket for ip ${ip}`);
-        connectionsPool.delete(ip)
+        logger.debug(`Closing socket for ip ${id}`);
+        connectionsPool.delete(id)
     }
 }
 
-function onErr(ip) {
+/**
+ * If a socket error, it execute this function
+ * @param {string} id
+ * @return {(data: string) => void}
+ */
+function onError(id) {
     return (data) => {
         logger.error(data)
     }
@@ -58,24 +121,82 @@ function onErr(ip) {
 
 /**
  *
- * @param {ListEvent | RoomEvent} listEvent
+ * @param {string} id
+ * @param {string} name
+ */
+export async function changeName(id, name) {
+    /** @type {Set<string>} */
+    let roomSubscribed = new Set();
+    for (const connection of connectionsPool.values()) {
+        if (connection.userId === id) {
+            roomSubscribed = connection.focused
+            break;
+        }
+    }
+    if (roomSubscribed.size < 1) {
+        logger.warn("No room subed for userid: " + id)
+        return;
+    }
+    let executions = [];
+    for (const roomId of roomSubscribed.values()) {
+        executions.push(putUserInRoom({id, names: name}, roomId))
+    }
+    return Promise.all(executions)
+        .then(() => {
+            for (const connection of connectionsPool.values()) {
+                for (const roomId of roomSubscribed.values()) {
+                    if (connection.focused.has(roomId)) {
+                        const msg = {
+                            type: "user",
+                            update: {
+                                id,
+                                evt: {
+                                    name
+                                }
+                            }
+                        }
+                        connection.socket.send(JSON.stringify(msg))
+                        break;
+                    }
+                }
+            }
+        })
+        .catch(e => logger.error("Error mid promises: " + e))
+}
+
+/**
+ *
+ * @param {ListEvent | RoomEvent} evt
  * @param {ListenerType} type
  */
-export function updateList(listEvent, type) {
-    logger.debug(`Broadcasting to WebSocket: ${JSON.stringify(listEvent)}`)
+export function updateList(evt, type) {
+    logger.debug(`Broadcasting to WebSocket: ${JSON.stringify(evt)}`)
     for (const [ip, connection] of connectionsPool.entries()) {
-        if (connection.listed) {
-            logger.debug(`Sending to ${ip}`)
-            connection.socket.send(JSON.stringify({
-                type,
-                update: listEvent
-            }))
+        switch (type) {
+            case "list":
+                if (connection.listed) {
+                    logger.debug(`Sending to ${ip}`)
+                    connection.socket.send(JSON.stringify({
+                        type,
+                        update: evt
+                    }))
+                }
+                break
+            case "room":
+                if (connection.focused.has(evt.id)) {
+
+                }
+                break
         }
     }
 }
 
 function close() {
-    socket.close()
+    for (const connection of connectionsPool.values())
+        connection.socket.close()
+    socket?.close(() => {
+        socket = null
+    })
 }
 
 export default {

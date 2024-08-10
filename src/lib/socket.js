@@ -1,11 +1,29 @@
+/**
+ * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ *
+ * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
+ * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
+ * @typedef {import('$lib/network.d.ts').UserEvent} UserEvent
+ * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomModificationEvent
+ * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
+ * @typedef {import('$lib/network.d.ts').WebSocketRequest} SubscribeMessage
+ *
+ * @typedef {((evt: ListEvent) => void) | ((evt: ListEvent) => void) | ((evt: UserEvent) => void)} NetCallback
+ */
+
+/** @type {WebSocket | null} */
 let socket;
-/** @type {Array<{listener: EventListener<ListEvent | RoomEvent>, type: ListenerType}>} */
+/** @type {Array<{listener: NetCallback, type: ListenerType}>} */
 let listeners = []
 
-export function init() {
-    if (socket) return
+function init() {
+    if (socket) {
+        return
+    }
     socket = new WebSocket("ws://localhost:43594/");
     socket.onopen = () => {
+        if (!socket)
+            throw new Error("WebSocket not initialized");
         console.log("Socket opened");
         socket.onmessage = (event) => {
             console.log(`Received from websocket: ${event.data}`);
@@ -16,26 +34,35 @@ export function init() {
                 }
             }
         }
-
-        socket.send(JSON.stringify({
-            listed: true,
-        }))
     }
 }
 
 /**
- *
- * @param {EventListener<ListEvent | RoomEvent>} listener
- * @param {ListenerType} type
+ * @param {NetCallback} listener
+ * @param {SubscribeMessage} subMsg
  */
-export function listenToUpdate(listener, type) {
-    listeners.push({listener, type})
+function listenToUpdate(listener, subMsg) {
+    listeners.push({listener, type: subMsg.type})
+
+    if (socket) {
+        socket.send(JSON.stringify(subMsg))
+    }
 }
 
 /**
- *
- * @param {EventListener<ListEvent | RoomEvent>} listener
+ * @param {NetCallback} listener
+ * @param {SubscribeMessage} subMsg
  */
-export function stopListening(listener) {
+function stopListening(listener, subMsg) {
     listeners = listeners.filter((l) => l.listener !== listener)
+
+    if (socket) {
+        socket.send(JSON.stringify(subMsg))
+    }
+}
+
+export default {
+    init,
+    listenToUpdate,
+    stopListening,
 }
