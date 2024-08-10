@@ -34,8 +34,8 @@
     }
 
     onMount(() => {
-        socket.listenToUpdate(onServerUpdate, {type: "list", listed: true})
         userId = localStorage.getItem(ls.itemKeys.id) ?? ""
+        socket.listenToUpdate(onServerUpdate, {type: "list", userId, listed: true})
     })
 
     onDestroy(() => {

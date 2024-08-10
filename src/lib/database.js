@@ -131,6 +131,39 @@ export async function createRoom(name, isPersisted, moderator) {
 }
 
 /**
+ *
+ * @param {{id: string, names: string, moderator?: boolean, vote?: string}} user
+ * @param {string} roomId
+ * @returns {Promise<void>}
+ */
+export async function putUserInRoom(user, roomId) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    let db;
+    try {
+        db = new Database(dbPath);
+        let users = db.prepare("select count(*) from users where id = ?;").get(user.id);
+        if (users['count(*)'] > 0) {
+            if (user.moderator) {
+                const mod = db.prepare("update users set names = ?, moderator = ? where id = ?;")
+                mod.run(user.names, user.moderator, user.id);
+            } else {
+                const mod = db.prepare("update users set names = ? where id = ?;")
+                mod.run(user.names, user.id);
+            }
+        } else {
+            const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, ?, ?);")
+            mod.run(user.id, user.names, user.moderator);
+        }
+        db.close()
+    } catch (e) {
+        if (db) {
+            db.close()
+        }
+        throw e
+    }
+}
+
+/**
  * Get all rooms
  * @return {Map<string, RoomInfo>}
  */

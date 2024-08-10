@@ -3,11 +3,12 @@
  *
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
  * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
+ * @typedef {import('$lib/network.d.ts').UserEvent} UserEvent
  * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomModificationEvent
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
+ * @typedef {import('$lib/network.d.ts').WebSocketRequest} SubscribeMessage
  *
- * @typedef {((evt: ListEvent) => void) | ((evt: RoomModificationEvent) => void)} NetCallback
- * @typedef {{listed?: boolean, focused?: string, type: ListenerType}} SubscribeMessage
+ * @typedef {((evt: ListEvent) => void) | ((evt: ListEvent) => void) | ((evt: UserEvent) => void)} NetCallback
  */
 
 /** @type {WebSocket | null} */

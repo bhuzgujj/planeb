@@ -1,5 +1,6 @@
 import {WebSocketServer} from "ws";
 import logger from "$lib/logger.js";
+import {putUserInRoom} from "$lib/database.js";
 
 /**
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
@@ -11,7 +12,7 @@ import logger from "$lib/logger.js";
 
 /** @type {WebSocketServer | null} */
 let socket = null;
-/** @type {Map<string, {socket: any, focused: Set<string>, listed: boolean}>} */
+/** @type {Map<string, {socket: any, userId: string | undefined, focused: Set<string>, listed: boolean}>} */
 const connectionsPool = new Map();
 
 function init() {
@@ -31,6 +32,7 @@ function init() {
                 const id = crypto.randomUUID();
                 connectionsPool.set(id, {
                     socket: ws,
+                    userId: undefined,
                     focused: new Set(),
                     listed: false
                 })
@@ -60,13 +62,20 @@ function onMessage(id) {
         if (!connection) {
             return
         }
+        /** @type {import("$lib/network.js").WebSocketRequest} */
         const item = JSON.parse(data)
         logger.debug(`Message received from ${id} ${data}`)
         if (item.focused) {
-            connection.focused.add(item.focused)
+            connection.focused.add(item.focused.id)
+        }
+        if (item.unfocused) {
+            connection.focused.delete(item.unfocused)
         }
         if (item.listed !== undefined || item.listed !== null) {
             connection.listed = item.listed
+        }
+        if (item.userId !== undefined) {
+            connection.userId = item.userId
         }
     }
 }
@@ -92,6 +101,51 @@ function onError(id) {
     return (data) => {
         logger.error(data)
     }
+}
+
+/**
+ *
+ * @param {string} id
+ * @param {string} name
+ */
+export async function changeName(id, name) {
+    /** @type {Set<string>} */
+    let roomSubscribed = new Set();
+    for (const connection of connectionsPool.values()) {
+        if (connection.userId === id) {
+            roomSubscribed = connection.focused
+            break;
+        }
+    }
+    if (roomSubscribed.size < 1) {
+        logger.warn("No room subed for userid: " + id)
+        return;
+    }
+    let executions = [];
+    for (const roomId of roomSubscribed.values()) {
+        executions.push(putUserInRoom({id, names: name, moderator: undefined, vote: undefined}, roomId))
+    }
+    return Promise.all(executions)
+        .then(() => {
+            for (const connection of connectionsPool.values()) {
+                for (const roomId of roomSubscribed.values()) {
+                    if (connection.focused.has(roomId)) {
+                        const msg = {
+                            type: "user",
+                            update: {
+                                id,
+                                evt: {
+                                    name
+                                }
+                            }
+                        }
+                        connection.socket.send(JSON.stringify(msg))
+                        break;
+                    }
+                }
+            }
+        })
+        .catch(e => logger.error("Error mid promises: " + e))
 }
 
 /**

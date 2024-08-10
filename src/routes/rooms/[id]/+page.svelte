@@ -1,20 +1,51 @@
 <script>
     import ls from "../../../constant.js";
-    import {onMount} from "svelte";
+    import {onDestroy, onMount} from "svelte";
+    import socket from "$lib/socket.js";
 
     export let data;
 
     /** @type {string} */
     let userId = ""
-    /** @type {boolean} */
-    let isMod = false
     /** @type {Array<import('$lib/data.d.ts').UserInfo>} */
     let users = data.users
     let tasks = data.tasks
 
+    /** @type {boolean} */
+    $: isMod = users.filter(u => u.id === userId && u.moderator).length >= 1
+
+
+    /**
+     * @typedef {import('$lib/network.d.ts').UserEvent} UserEvent
+     * @param {UserEvent} update
+     */
+    function onUserUpdate(update) {
+        users = users.map(user => {
+            if (user.id === update.id) {
+                user = {...user, ...update.evt}
+            }
+            return user
+        })
+    }
+
     onMount(() => {
         userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        isMod = users.filter(u => u.id === userId && u.moderator).length >= 1
+        let userName = localStorage.getItem(ls.itemKeys.name) ?? ""
+        socket.listenToUpdate(onUserUpdate, {
+            type: "user",
+            userId,
+            focused: {
+                id: data.id,
+                user: {
+                    id: userId,
+                    name: userName
+                }
+            }
+        })
+    })
+
+    onDestroy(() => {
+        socket.stopListening(onUserUpdate, {type: "user", unfocused: data.id})
     })
 </script>
 
