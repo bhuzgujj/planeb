@@ -14,10 +14,6 @@
                     if (result.type === 'success' && result?.data?.location) {
                         const moderatorId = localStorage.getItem(ls.itemKeys.id)
                         const moderatorName = localStorage.getItem(ls.itemKeys.name)
-                        console.log(cards)
-                        if (Object.keys(cards).length < 2) {
-                            return
-                        }
                         await fetch("/rooms", {
                             method: "POST",
                             body: JSON.stringify({
@@ -26,8 +22,7 @@
                                 moderator: {
                                     id: moderatorId,
                                     name: moderatorName
-                                },
-                                cards
+                                }
                             })
                         })
                         await goto(result?.data?.location.toString());
