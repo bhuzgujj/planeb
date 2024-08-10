@@ -20,6 +20,14 @@ export type UserEvent = {
         vote?: string | undefined;
     }
 }
+export type TaskEvent = {
+    action: CrudAction,
+    id: string,
+    evt: {
+
+        name: string;
+    }
+}
 export type UserJoinEvent = {
     user: {
         id: string,

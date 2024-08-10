@@ -24,7 +24,6 @@ let roomFolder = ""
  * @return {Promise<void>}
  */
 async function executeQuery(path, query, dataFiller) {
-    logger.debug(`Initializing database...`);
     let sql = queries.readQuery(query);
     /**
      * @type {any}
@@ -38,7 +37,7 @@ async function executeQuery(path, query, dataFiller) {
         }
         db.close()
     } catch (e) {
-        logger.debug(e)
+        logger.warn(e)
         db.close()
         throw e
     }
@@ -100,7 +99,10 @@ export function init(folder, rooms, masterDb) {
     } catch (e) {
         logger.error(`Could not read folder ${roomFolder}: ${e}`)
     }
-    executeQuery(`${folder}/${masterDb}`, "init", null).catch(logger.error)
+    logger.debug(`Initializing master database...`);
+    executeQuery(`${folder}/${masterDb}`, "init", null)
+        .then(() => logger.debug(`Master database initialized`))
+        .catch(logger.error)
 }
 
 /**
@@ -114,6 +116,7 @@ export async function createRoom(name, isPersisted, moderator) {
     const roomId = crypto.randomUUID();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
+        logger.debug(`Initializing database "${roomId}:${name}"...`);
         await executeQuery(dbPath, "create_room", db => {
             const md = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
             md.run("name", name);
@@ -122,17 +125,18 @@ export async function createRoom(name, isPersisted, moderator) {
             const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 1);")
             mod.run(moderator.id, moderator.name);
         })
+        logger.debug(`"${roomId}:${name}" database initialized`)
         rooms.set(roomId, { name: name, isPersisted: isPersisted, owner: moderator.id });
         return roomId.toString()
     } catch (e) {
-        logger.error(e)
+        logger.error(`"${roomId}:${name}" database initialized: ${e}`)
         return roomId.toString()
     }
 }
 
 /**
  *
- * @param {{id: string, names: string, moderator?: boolean, vote?: string}} user
+ * @param {{id: string, names: string, moderator?: boolean}} user
  * @param {string} roomId
  * @returns {Promise<void>}
  */
@@ -198,7 +202,6 @@ export function getRoomsById(id) {
         for (const task of db.prepare("select * from tasks;").iterate()) {
             users.push(task)
         }
-        logger.debug(users)
         db.close()
         return {
             id,

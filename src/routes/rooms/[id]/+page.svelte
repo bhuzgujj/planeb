@@ -14,7 +14,6 @@
     /** @type {boolean} */
     $: isMod = users.filter(u => u.id === userId && u.moderator).length >= 1
 
-
     /**
      * @typedef {import('$lib/network.d.ts').UserEvent} UserEvent
      * @param {UserEvent} update

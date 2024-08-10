@@ -14,6 +14,10 @@
                     if (result.type === 'success' && result?.data?.location) {
                         const moderatorId = localStorage.getItem(ls.itemKeys.id)
                         const moderatorName = localStorage.getItem(ls.itemKeys.name)
+                        console.log(cards)
+                        if (Object.keys(cards).length < 2) {
+                            return
+                        }
                         await fetch("/rooms", {
                             method: "POST",
                             body: JSON.stringify({
@@ -21,8 +25,9 @@
                                 persisted: result?.data?.persisted,
                                 moderator: {
                                     id: moderatorId,
-                                    name: moderatorName,
-                                }
+                                    name: moderatorName
+                                },
+                                cards
                             })
                         })
                         await goto(result?.data?.location.toString());
@@ -36,7 +41,7 @@
             {form?.nameError}
         </p>
     {/if}
-    <label>Room name: <input name="name" type="text" value={form?.name ?? ""}/></label>
+    <label>Room name: <input name="name" type="text" value={form?.name ?? ""}></label>
     <br>
     <label>Persist room: <input name="persisted" type="checkbox"></label>
     <br>

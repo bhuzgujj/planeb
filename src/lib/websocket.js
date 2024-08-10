@@ -8,11 +8,13 @@ import {putUserInRoom} from "$lib/database.js";
  * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
  * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomEvent
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
+ * @typedef {{socket: any, userId: string | undefined, focused: Set<string>, listed: boolean}} ConnectionItem
+ * @typedef {Map<string, ConnectionItem>} ConnectionPool
  */
 
 /** @type {WebSocketServer | null} */
 let socket = null;
-/** @type {Map<string, {socket: any, userId: string | undefined, focused: Set<string>, listed: boolean}>} */
+/** @type {ConnectionPool}>} */
 const connectionsPool = new Map();
 
 function init() {
@@ -58,20 +60,34 @@ function init() {
  */
 function onMessage(id) {
     return (data) => {
+        /** @type {ConnectionItem | undefined} */
         const connection = connectionsPool.get(id)
-        if (!connection) {
+        if (connection === undefined) {
             return
         }
         /** @type {import("$lib/network.js").WebSocketRequest} */
         const item = JSON.parse(data)
         logger.debug(`Message received from ${id} ${data}`)
-        if (item.focused) {
-            connection.focused.add(item.focused.id)
+        if (item.focused?.id !== item.unfocused) {
+            if (item.focused) {
+                if (!connection.focused.has(item.focused.id)) {
+                    putUserInRoom({
+                        id: item.focused.user.id,
+                        names: item.focused.user.name
+                    }, item.focused.id)
+                        .then(() => {
+                            if (item.focused?.id) {
+                                connection.focused.add(item.focused?.id)
+                            }
+                        })
+                        .catch(logger.error)
+                }
+            }
+            if (item.unfocused) {
+                connection.focused.delete(item.unfocused)
+            }
         }
-        if (item.unfocused) {
-            connection.focused.delete(item.unfocused)
-        }
-        if (item.listed !== undefined || item.listed !== null) {
+        if (item.listed !== undefined) {
             connection.listed = item.listed
         }
         if (item.userId !== undefined) {
@@ -123,7 +139,7 @@ export async function changeName(id, name) {
     }
     let executions = [];
     for (const roomId of roomSubscribed.values()) {
-        executions.push(putUserInRoom({id, names: name, moderator: undefined, vote: undefined}, roomId))
+        executions.push(putUserInRoom({id, names: name}, roomId))
     }
     return Promise.all(executions)
         .then(() => {
