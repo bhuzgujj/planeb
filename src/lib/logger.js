@@ -1,6 +1,6 @@
 /**
- * @typedef { "error" | "info" | "warn" | "debug" | "none"} LoggingLevel
- * @typedef {{ level?: LoggingLevel, showOrigin?: boolean }} LoggerConfig
+ * @typedef {import("$lib/config.js").LoggingLevel} LoggingLevel
+ * @typedef {import("$lib/config.js").LoggerConfig} LoggerConfig
  * @typedef {(config: LoggerConfig) => void} Initializer
  */
 

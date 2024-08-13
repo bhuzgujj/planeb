@@ -1,6 +1,6 @@
 <script>
     import {onDestroy, onMount} from "svelte";
-    import socket from "$lib/socket.js";
+    import socket from "$lib/net/socket.js";
     import {goto} from "$app/navigation";
     import ls from "../../constant.js";
 

@@ -1,6 +1,5 @@
 import {json} from "@sveltejs/kit";
-import {createRoom} from "$lib/database.js";
-import {updateList} from "$lib/websocket.js";
+import {createRoom, updateList} from "$lib/gateway.js";
 /**
  * @typedef {import("$lib/logger.js").default}
  */
@@ -11,9 +10,10 @@ export async function POST({request}) {
     logger.debug(`Adding new room ${JSON.stringify({
         name: body.name, 
         persisted: body.persisted, 
-        moderator: body.moderator
+        moderator: body.moderator,
+        cards: body.cards
     })}`);
-    let id = await createRoom(body.name, body.persisted, body.moderator);
+    let id = await createRoom(body.name, body.persisted, body.moderator, body.cards);
     updateList({
         action: "add",
         id,

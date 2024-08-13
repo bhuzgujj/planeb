@@ -1,4 +1,4 @@
-import socket from "$lib/socket.js";
+import socket from "$lib/net/socket.js";
 import ls from "./constant.js";
 
 let started = false;

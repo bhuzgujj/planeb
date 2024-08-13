@@ -1,6 +1,6 @@
-import {deleteRoomById} from "$lib/database.js";
+import {deleteRoomById} from "$lib/db/database.js";
 import {json} from "@sveltejs/kit";
-import {updateList} from "$lib/websocket.js";
+import {updateList} from "$lib/gateway.js";
 
 export async function DELETE({params}) {
     let roomInfo = deleteRoomById(params.id);

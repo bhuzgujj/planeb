@@ -1,20 +1,66 @@
 import Database from 'better-sqlite3';
-import {queries} from "$lib/queries.js";
+import {queries} from "$lib/db/queries.js";
 import logger from "$lib/logger.js";
-import {DATABASE_FOLDER} from "$env/static/private";
+import {DATABASE, DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
+
 
 /**
  * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
  * @typedef {import('$lib/data.d.ts').UserInfo} UserInfo
  * @typedef {import('$lib/data.d.ts').TaskInfo} TaskInfo
  * @typedef {import('$lib/data.d.ts').DbUser} DbUser
- * @typedef {"init" | "create_room"} Query
+ * @typedef {import('$lib/data.d.ts').Query} Query
+ * @typedef {import('$lib/data.d.ts').CardSet} CardSet
+ * @typedef {import('$lib/data.d.ts').Card} Card
+ *
+ * @typedef {import('$lib/config.js').DatabaseConfig} DatabaseConfig
  */
 
 /** @type {Map<string, RoomInfo>} */
 let rooms = new Map()
+/** @type {Map<string, CardSet>} */
+let cardsSet = new Map()
 let roomFolder = ""
+
+/**
+ * Initialize master db and room state
+ * @param {DatabaseConfig} config
+ */
+export function init(config) {
+    logger.debug("Starting database...");
+    roomFolder = `${config.folder}/${config.roomSubFolder}`;
+    try {
+        fs.mkdirSync(roomFolder, {recursive: true});
+    } catch (e) {
+        logger.debug(`Could not create folder ${roomFolder}`)
+    }
+
+    try {
+        fs.readdirSync(roomFolder)
+            .forEach(file => fillState(roomFolder, file));
+    } catch (e) {
+        logger.error(`Could not read folder ${roomFolder}: ${e}`)
+    }
+    logger.debug(`Initializing master database...`);
+    executeQuery(`${config.folder}/${config.masterDbNames}`, "init", db => {
+        /** @type {Array<any>} */
+        const sets = db.prepare("select * from cards_set;").all();
+        for (const set of sets) {
+            /** @type {Array<any>} */
+            const cards = db.prepare("select * from cards where cards_set_id = ?;").all(set.id);
+            cardsSet.set(set.id, {
+                name: set.names,
+                cards: cards.map(card => ({
+                    id: card.id,
+                    value: card.val,
+                    label: card.label,
+                }))
+            })
+        }
+    })
+        .then(() => logger.debug(`Master database initialized`))
+}
 
 /**
  * Execute a query on a database
@@ -37,8 +83,8 @@ async function executeQuery(path, query, dataFiller) {
         }
         db.close()
     } catch (e) {
-        logger.warn(e)
         db.close()
+        logger.error(e)
         throw e
     }
 }
@@ -73,46 +119,80 @@ function fillState(dir, fileName) {
         if (db) {
             db.close()
         }
-        logger.error(`Could not read db ${roomFolder}/${fileName}: ${e}` );
+        logger.error(`Could not read db ${roomFolder}/${fileName}: ${e}`);
         fs.unlink(`${dir}/${fileName}`, logger.error)
     }
 }
 
 /**
- * Initialize master db and room state
- * @param {string} folder
- * @param {string} rooms
- * @param {string} masterDb
+ *
+ * @param {string} id
+ * @param {{name: string, cards: Array<Card>}} cardSet
  */
-export function init(folder, rooms, masterDb) {
-    logger.debug("Starting database...");
-    roomFolder = `${folder}/${rooms}`;
+export async function createCardSet(id, cardSet) {
+    let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
+    let db;
     try {
-        fs.mkdirSync(roomFolder, { recursive: true });
+        logger.debug(`Initializing card set...`);
+        db = new Database(dbPath);
+        const set = db.prepare("insert into cards_set (id, names) values (?, ?);")
+        set.run(id, cardSet.name);
+        for (const card of cardSet.cards) {
+            const c = db.prepare("insert into cards (id, val, label, cards_set_id) values (?, ?, ?, ?);")
+            c.run(card.id, card.value, card.label, id);
+        }
+        logger.debug(`card set initialized`)
+        cardsSet.set(id, cardSet);
     } catch (e) {
-        logger.debug(`Could not create folder ${roomFolder}`)
+        logger.error(`card set failed initialized: ${e}`)
+    } finally {
+        if (db) {
+            db.close()
+        }
     }
+}
 
+/**
+ *
+ * @param {string} id
+ * @param {{name: string, cards: Array<Card>}} cardSet
+ */
+export async function modifyCardSet(id, cardSet) {
+    let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
+    let db;
     try {
-        fs.readdirSync(roomFolder)
-            .forEach(file => fillState(roomFolder, file));
+        logger.debug(`Modifying card set...`);
+        db = new Database(dbPath);
+        db.prepare("update cards_set set names = ? where id = ?;")
+            .run(cardSet.name, id);
+        for (const card of cardSet.cards) {
+            const resp = db.prepare("update cards set val = ?, label = ? where id = ?;")
+                .run(card.value, card.label, card.id);
+            if (resp.changes === 0) {
+                db.prepare("insert into cards (id, val, label, cards_set_id) values (?, ?, ?, ?);")
+                    .run(card.id, card.value, card.label, id);
+            }
+        }
+        logger.debug(`card set Modifyed`)
+        cardsSet.set(id, cardSet);
     } catch (e) {
-        logger.error(`Could not read folder ${roomFolder}: ${e}`)
+        logger.error(`card set failed modification: ${e}`)
+    } finally {
+        if (db) {
+            db.close()
+        }
     }
-    logger.debug(`Initializing master database...`);
-    executeQuery(`${folder}/${masterDb}`, "init", null)
-        .then(() => logger.debug(`Master database initialized`))
-        .catch(logger.error)
 }
 
 /**
  * Create a room
  * @param {string} name
  * @param {boolean} isPersisted
- * @param {{id: string, name: string}}moderator
+ * @param {{id: string, name: string}} moderator
+ * @param {CardSet}cards
  * @return {Promise<string>}
  */
-export async function createRoom(name, isPersisted, moderator) {
+export async function createRoom(name, isPersisted, moderator, cards) {
     const roomId = crypto.randomUUID();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
@@ -124,12 +204,16 @@ export async function createRoom(name, isPersisted, moderator) {
             md.run("owner", moderator.id);
             const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 1);")
             mod.run(moderator.id, moderator.name);
+            const card = db.prepare("insert into cards (id, val, label) values (?, ?, ?);")
+            for (const c of cards.cards) {
+                card.run(c.id, c.value, c.label);
+            }
         })
         logger.debug(`"${roomId}:${name}" database initialized`)
-        rooms.set(roomId, { name: name, isPersisted: isPersisted, owner: moderator.id });
+        rooms.set(roomId, {name: name, isPersisted: isPersisted, owner: moderator.id});
         return roomId.toString()
     } catch (e) {
-        logger.error(`"${roomId}:${name}" database initialized: ${e}`)
+        logger.error(`"${roomId}:${name}" database failed initialized: ${e}`)
         return roomId.toString()
     }
 }
@@ -165,6 +249,14 @@ export async function putUserInRoom(user, roomId) {
         }
         throw e
     }
+}
+
+/**
+ * Get all rooms
+ * @return {Map<string, CardSet>}
+ */
+export function getCardSet() {
+    return cardsSet;
 }
 
 /**

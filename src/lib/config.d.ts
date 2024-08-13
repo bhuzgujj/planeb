@@ -1,0 +1,16 @@
+export type LoggingLevel = "error" | "info" | "warn" | "debug" | "none"
+export type LoggerConfig = {
+    level?: LoggingLevel,
+    showOrigin?: boolean
+}
+
+export type DatabaseConfig = {
+    folder: string,
+    roomSubFolder: string,
+    masterDbNames: string
+}
+
+export type GatewayConfig = {
+    logging: LoggerConfig
+    database: DatabaseConfig
+}

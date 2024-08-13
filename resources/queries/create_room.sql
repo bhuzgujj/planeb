@@ -18,7 +18,7 @@ create table tasks(
     id text primary key asc,
     names text not null,
     comments text default null,
-    card_id integer not null,
+    card_id text not null,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default null,
     foreign key(card_id) references cards(id) on delete cascade
@@ -33,8 +33,8 @@ begin
 end;
 
 create table cards(
-    id integer primary key asc,
-    val integer not null,
+    id text primary key asc,
+    val float not null,
     label text not null,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default null
@@ -52,7 +52,7 @@ create table votes(
     id integer primary key asc,
     user_id text not null,
     task_id text not null,
-    card_id integer not null,
+    card_id text not null,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default null,
     foreign key(card_id) references cards(id) on delete cascade,

@@ -8,7 +8,7 @@
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
  * @typedef {import('$lib/network.d.ts').WebSocketRequest} SubscribeMessage
  *
- * @typedef {((evt: ListEvent) => void) | ((evt: ListEvent) => void) | ((evt: UserEvent) => void)} NetCallback
+ * @typedef {import('$lib/network.d.ts').NetCallback} NetCallback
  */
 
 /** @type {WebSocket | null} */

@@ -1,14 +1,15 @@
 import {WebSocketServer} from "ws";
 import logger from "$lib/logger.js";
-import {putUserInRoom} from "$lib/database.js";
+import {putUserInRoom} from "$lib/db/database.js";
 
 /**
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
  * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/network.d.ts').SetsEvent} SetsEvent
  * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
  * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomEvent
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
- * @typedef {{socket: any, userId: string | undefined, focused: Set<string>, listed: boolean}} ConnectionItem
+ * @typedef {{socket: any, userId: string | undefined, focused: Set<string>, listed: boolean, setted: boolean}} ConnectionItem
  * @typedef {Map<string, ConnectionItem>} ConnectionPool
  */
 
@@ -36,7 +37,8 @@ function init() {
                     socket: ws,
                     userId: undefined,
                     focused: new Set(),
-                    listed: false
+                    listed: false,
+                    setted: false,
                 })
                 logger.debug(`Connection from ${ req.socket.remoteAddress}`)
                 ws.on("message", onMessage(id))
@@ -89,6 +91,9 @@ function onMessage(id) {
         }
         if (item.listed !== undefined) {
             connection.listed = item.listed
+        }
+        if (item.setted !== undefined) {
+            connection.setted = item.setted
         }
         if (item.userId !== undefined) {
             connection.userId = item.userId
@@ -166,7 +171,7 @@ export async function changeName(id, name) {
 
 /**
  *
- * @param {ListEvent | RoomEvent} evt
+ * @param {ListEvent | RoomEvent | SetsEvent} evt
  * @param {ListenerType} type
  */
 export function updateList(evt, type) {
@@ -182,10 +187,17 @@ export function updateList(evt, type) {
                     }))
                 }
                 break
-            case "room":
-                if (connection.focused.has(evt.id)) {
-
+            case "sets":
+                if (connection.setted) {
+                    logger.debug(`Sending to ${ip}`)
+                    connection.socket.send(JSON.stringify({
+                        type,
+                        update: evt
+                    }))
                 }
+                break
+            default:
+                logger.debug(`Recieved ${type}: ${evt}`)
                 break
         }
     }

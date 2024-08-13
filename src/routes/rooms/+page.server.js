@@ -1,4 +1,4 @@
-import {getRooms} from "$lib/database.js";
+import {getRooms} from "$lib/gateway.js";
 
 export function load(props) {
     return {
