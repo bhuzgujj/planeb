@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
-import {getRoomsById} from "$lib/database.js";
+import {getRoomsById} from "$lib/gateway.js";
 
 export function load({ params }) {
-    let room = getRoomsById(params.id)
+    const room = getRoomsById(params.id)
     if (!room) {
         throw error(404, {
             message: "Room not found"

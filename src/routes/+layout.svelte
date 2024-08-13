@@ -23,7 +23,6 @@
             } else {
                 console.error("No userid found in localStorage, key looked is:" + "planeb.id")
             }
-            fetch(`/users/`)
         }
     }
 
@@ -37,6 +36,7 @@
     <div style="height: 100%; flex-grow: 1">
         <a href="/">Home</a>
         <a href="/rooms">Rooms</a>
+        <a href="/cards">Card sets</a>
     </div>
     <label>
         Name: <input type="text" style="padding: 0; margin: 0;" on:keypress={(e) => nameChange(e)} bind:value={name}/>

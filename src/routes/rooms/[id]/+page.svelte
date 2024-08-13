@@ -1,7 +1,7 @@
 <script>
     import ls from "../../../constant.js";
     import {onDestroy, onMount} from "svelte";
-    import socket from "$lib/socket.js";
+    import socket from "$lib/net/socket.js";
 
     export let data;
 
@@ -80,7 +80,7 @@
     </tr>
     {#if tasks.length > 0}
         {#each tasks as task}
-            <tr>
+            <tr style="vertical-align: center">
                 <td>{task.no}</td>
                 <td>{task.name}</td>
                 <td style="text-align: center">{task.vote ?? '?'}</td>

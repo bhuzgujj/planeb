@@ -29,7 +29,7 @@ begin
 end;
 
 create table if not exists cards_set(
-    id integer primary key not null,
+    id text primary key not null,
     names text not null,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default null
@@ -44,10 +44,10 @@ begin
 end;
 
 create table if not exists cards(
-    id integer primary key not null,
-    val integer not null,
+    id text primary key not null,
+    val float not null,
     label text not null,
-    cards_set_id integer not null,
+    cards_set_id text not null,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default null,
     foreign key(cards_set_id) references cards_set(id) on delete cascade

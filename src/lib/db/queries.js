@@ -1,7 +1,7 @@
 import fs from "fs";
 
 /**
- * @typedef {"init" | "create_room"} Query
+ * @typedef {import('$lib/data.d.ts').Query} Query
  */
 
 /**
@@ -23,7 +23,7 @@ function readMigration(name) {
     return fs.readFileSync(`./resources/migrations/${name}.sql`, "utf-8")
 }
 
-export let queries = {
+export const queries = {
     readQuery,
     readMigration
 }

@@ -19,3 +19,16 @@ export type TaskInfo = {
     name: string;
     vote: string;
 }
+
+export type CardSet = {
+    name: string;
+    cards: Array<Card>
+}
+
+export type Card = {
+    id: string,
+    value: number,
+    label: string
+}
+
+export type Query = "init" | "create_room"

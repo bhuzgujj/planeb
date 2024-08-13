@@ -1,5 +1,5 @@
 import {json} from "@sveltejs/kit";
-import {changeName} from "$lib/websocket.js";
+import {changeName} from "$lib/gateway.js";
 
 export async function PUT({params, request}) {
     const newValues = await request.json()

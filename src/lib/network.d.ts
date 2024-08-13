@@ -1,6 +1,6 @@
-import {ListInfo} from "./data";
+import {CardSet, ListInfo} from "./data";
 
-export type ListenerType = "list" | "room" | "user"
+export type ListenerType = "list" | "room" | "user" | "sets"
 export type CrudAction = "add" | "update" | "remove"
 
 export type ListEvent = {
@@ -20,11 +20,15 @@ export type UserEvent = {
         vote?: string | undefined;
     }
 }
+export type SetsEvent = {
+    action: CrudAction,
+    id: string,
+    evt: CardSet
+}
 export type TaskEvent = {
     action: CrudAction,
     id: string,
     evt: {
-
         name: string;
     }
 }
@@ -37,8 +41,14 @@ export type UserJoinEvent = {
 }
 export type WebSocketRequest = {
     listed?: boolean,
+    setted?: boolean,
     focused?: UserJoinEvent,
     unfocused?: string,
     userId?: string,
     type: ListenerType
 }
+
+export type NetCallback = ((evt: ListEvent) => void) |
+    ((evt: TaskEvent) => void) |
+    ((evt: SetsEvent) => void) |
+    ((evt: UserEvent) => void)
