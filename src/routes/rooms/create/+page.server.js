@@ -12,6 +12,7 @@ export const actions = {
         const data = await request.formData();
         const name = data.get("name");
         const persisted = data.get("persisted");
+        const taskPrefix = data.get("task_prefix");
         /** @type any */
         const sets = data.get("sets");
         if(!sets) {
@@ -34,7 +35,8 @@ export const actions = {
             location: "/rooms/",
             name,
             persisted,
-            cards
+            cards,
+            taskPrefix
         }
     }
 };

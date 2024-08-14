@@ -4,6 +4,7 @@
     import {goto} from "$app/navigation";
     import ls from "../../constant.js";
 
+    /** @type {import('./$types').PageData} */
     export let data;
 
     let rooms = data.rooms;
@@ -35,11 +36,11 @@
 
     onMount(() => {
         userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        socket.listenToUpdate(onServerUpdate, {type: "list", userId, listed: true})
+        socket.listenToUpdate(onServerUpdate, {type: "list", data: true, userId})
     })
 
     onDestroy(() => {
-        socket.stopListening(onServerUpdate, {type: "list", listed: false})
+        socket.stopListening(onServerUpdate, {type: "list", data: false, userId})
     })
 
     /**
@@ -61,13 +62,13 @@
         <th style="padding-left: 10px">Rooms name</th>
     </tr>
     {#each rooms.keys() as id}
-        <tr id={id} style="vertical-align: center">
+        <tr id={id}>
             <td>
                 <button on:click={() => deleteRoom(id)} class="bdel" style="margin-bottom: 0px" disabled={!isOwner(id, userId)}>
                     Delete
                 </button>
             </td>
-            <td style="width: 100%; vertical-align: center; padding-left: 10px" on:click={() => goto(`/rooms/${id}`)}>
+            <td style="width: 100%; padding-left: 10px" on:click={() => goto(`/rooms/${id}`)}>
                 {rooms.get(id)?.name}
             </td>
         </tr>

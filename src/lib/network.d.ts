@@ -1,23 +1,32 @@
-import {CardSet, ListInfo} from "./data";
+import {CardSet, RoomInfo, UserInfo} from "./data";
 
-export type ListenerType = "list" | "room" | "user" | "sets"
+export type ListenerType = "list" | "room" | "user" | "sets" | "tasks"
+export type EventTypes = ListEvent | RoomEvent | SetsEvent
 export type CrudAction = "add" | "update" | "remove"
-
 export type ListEvent = {
     action: CrudAction,
     id: string,
-    evt: ListInfo
+    evt: RoomInfo
 }
-export type RoomModificationEvent = {
-    id: string,
-    evt: ListInfo
-}
-export type UserEvent = {
-    action: CrudAction,
-    id: string,
+export type RoomEvent = {
     evt: {
-        name?: string | undefined;
-        vote?: string | undefined;
+        room?: RoomInfo,
+        user?: {
+            id: string;
+            name?: string;
+            moderator?: boolean;
+            vote?: string | undefined;
+        },
+        task?: {
+            action: CrudAction,
+            id: string,
+            evt: {
+                no?: string;
+                name?: string;
+                comments?: string;
+                vote?: string;
+            }
+        }
     }
 }
 export type SetsEvent = {
@@ -25,30 +34,22 @@ export type SetsEvent = {
     id: string,
     evt: CardSet
 }
-export type TaskEvent = {
-    action: CrudAction,
-    id: string,
-    evt: {
-        name: string;
-    }
-}
-export type UserJoinEvent = {
-    user: {
-        id: string,
-        name: string
-    },
-    id: string
-}
-export type WebSocketRequest = {
-    listed?: boolean,
-    setted?: boolean,
-    focused?: UserJoinEvent,
-    unfocused?: string,
-    userId?: string,
-    type: ListenerType
+type EventData<T extends ListenerType> =
+    T extends "room" ? {
+            user: {
+                name: string
+            },
+            roomId: string,
+            action: CrudAction,
+        }
+    : boolean
+export type WebSocketRegisteringEvent<T extends ListenerType> = {
+    type: T,
+    userId: string,
+    data: EventData<T>
 }
 
-export type NetCallback = ((evt: ListEvent) => void) |
-    ((evt: TaskEvent) => void) |
+export type NetCallback =
+    ((evt: ListEvent) => void) |
     ((evt: SetsEvent) => void) |
-    ((evt: UserEvent) => void)
+    ((evt: RoomEvent) => void)

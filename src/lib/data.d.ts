@@ -1,7 +1,15 @@
-export type ListInfo = {
+export type RoomInfo = {
     name: string;
     isPersisted: boolean;
     owner: string;
+    taskRegex?: string;
+}
+export type Room = {
+    id: string,
+    users: UserInfo[],
+    tasks: TaskInfo[],
+    cards: Card[],
+    roomInfo: RoomInfo
 }
 export type UserInfo = {
     id: string;
@@ -15,8 +23,10 @@ export type DbUser = {
     moderator: number;
 }
 export type TaskInfo = {
+    id: string;
     no: string;
     name: string;
+    comments: string;
     vote: string;
 }
 

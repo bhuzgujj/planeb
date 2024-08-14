@@ -16,6 +16,7 @@ end;
 
 create table tasks(
     id text primary key asc,
+    task_no text null,
     names text not null,
     comments text default null,
     card_id text not null,

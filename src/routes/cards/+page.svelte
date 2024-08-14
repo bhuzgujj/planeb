@@ -11,7 +11,7 @@
     /** @type {import('./$types').ActionData} */
     export let form;
 
-    /** */
+    /** @type {import('./$types').PageData} */
     export let data;
 
     /** @type {Map<string, CardSet>} **/
@@ -43,11 +43,11 @@
 
     onMount(() => {
         userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        socket.listenToUpdate(onServerUpdate, {type: "sets", userId, setted: true})
+        socket.listenToUpdate(onServerUpdate, {type: "sets", data: true, userId})
     })
 
     onDestroy(() => {
-        socket.stopListening(onServerUpdate, {type: "sets", setted: false})
+        socket.stopListening(onServerUpdate, {type: "sets", data: false, userId})
     })
 </script>
 <form method="post">
@@ -68,13 +68,13 @@
         <th style="padding-left: 10px">Set name</th>
     </tr>
     {#each sets.keys() as id}
-        <tr id={id} style="vertical-align: center">
+        <tr id={id}>
             <td>
                 <button on:click={() => deleteSet(id)} class="bdel" style="margin-bottom: 0px">
                     Delete
                 </button>
             </td>
-            <td style="width: 100%; vertical-align: center; padding-left: 10px" on:click={() => goto(`/cards/${id}`)}>
+            <td style="width: 100%; padding-left: 10px" on:click={() => goto(`/cards/${id}`)}>
                 {sets.get(id)?.name}
             </td>
         </tr>
