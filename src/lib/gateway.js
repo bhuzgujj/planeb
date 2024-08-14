@@ -2,6 +2,7 @@ import * as db from './db/database.js';
 import * as ws from './net/websocket.js';
 import logger from "$lib/logger.js";
 import {putUserInRoom} from "./db/database.js";
+import {notify} from "./net/websocket.js";
 
 /**
  * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
@@ -160,4 +161,30 @@ export async function modifySet(id, cardSet) {
         id,
         evt: cardSet
     }, "sets", new Set())
+}
+
+/**
+ * Add a task to a room
+ * @param {import("$lib/data.js").Task} task
+ * @param {string} roomId
+ * @returns {Promise<void>}
+ */
+export async function addTaskToRoom(task, roomId) {
+    const id = await db.addTaskToRoom(task, roomId)
+    const rooms = new Set()
+    rooms.add(roomId)
+    /** @type {import("$lib/network.js").RoomEvent} */
+    const evt = {
+        evt: {
+            task: {
+                action: "add",
+                id,
+                evt: {
+                    name: task.name,
+                    no: task.no,
+                }
+            }
+        }
+    };
+    await ws.notify(evt, "room", rooms)
 }

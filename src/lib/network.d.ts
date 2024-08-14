@@ -1,4 +1,4 @@
-import {CardSet, RoomInfo, UserInfo} from "./data";
+import {CardSet, RoomInfo} from "./data";
 
 export type ListenerType = "list" | "room" | "user" | "sets" | "tasks"
 export type EventTypes = ListEvent | RoomEvent | SetsEvent

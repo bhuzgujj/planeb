@@ -216,11 +216,47 @@ export async function createRoom(name, isPersisted, moderator, cards, taskRegex)
             }
         })
         logger.debug(`"${roomId}:${name}" database initialized`)
-        rooms.set(roomId, {name: name, isPersisted: isPersisted, owner: moderator.id});
+        rooms.set(roomId, {
+            name: name,
+            isPersisted: isPersisted,
+            owner: moderator.id,
+            taskRegex: taskRegex
+        });
         return roomId.toString()
     } catch (e) {
         logger.error(`"${roomId}:${name}" database failed initialized: ${e}`)
         return roomId.toString()
+    }
+}
+
+/**
+ * Add a task to a room
+ * @param {import("$lib/data.js").Task} task
+ * @param {string} roomId
+ * @returns {Promise<string>}
+ */
+export async function addTaskToRoom(task, roomId) {
+    const taskId = crypto.randomUUID();
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    let db;
+    try {
+        logger.debug(`"${roomId}:${task.name}" add a task: ${task}`)
+        db = new Database(dbPath)
+        if (task.no) {
+            db.prepare("insert into tasks (id, names) values (?, ?);")
+                .run(taskId, task.name)
+        } else {
+            db.prepare("insert into tasks (id, names, task_no) values (?, ?, ?);")
+                .run(taskId, task.name, task.no)
+        }
+        return taskId.toString()
+    } catch (e) {
+        logger.error(`"${roomId}:${task.name}" failed to add a task: ${e}`)
+        return taskId.toString()
+    } finally {
+        if (db) {
+            db.close()
+        }
     }
 }
 

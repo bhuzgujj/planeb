@@ -19,7 +19,7 @@ create table tasks(
     task_no text null,
     names text not null,
     comments text default null,
-    card_id text not null,
+    card_id text null,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default null,
     foreign key(card_id) references cards(id) on delete cascade

@@ -10,7 +10,7 @@ import {addUserToRoom} from "$lib/gateway.js";
  * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
  * @typedef {import('$lib/network.d.ts').RoomEvent} RoomEvent
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
- * @typedef {{socket: any, user: string | null, focused: Set<string>, listed: boolean, tasks: boolean, setted: boolean}} ConnectionItem
+ * @typedef {{socket: any, userId: string | null, focused: Set<string>, listed: boolean, tasks: boolean, setted: boolean}} ConnectionItem
  * @typedef {Map<string, ConnectionItem>} ConnectionPool
  */
 

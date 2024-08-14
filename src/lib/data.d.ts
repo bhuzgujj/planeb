@@ -24,12 +24,15 @@ export type DbUser = {
 }
 export type TaskInfo = {
     id: string;
-    no: string;
+    no?: string;
     name: string;
-    comments: string;
-    vote: string;
+    comments?: string;
+    vote?: string;
 }
-
+export type Task = {
+    name: string,
+    no?: string
+}
 export type CardSet = {
     name: string;
     cards: Array<Card>

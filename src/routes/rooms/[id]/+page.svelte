@@ -12,6 +12,7 @@
     let userName = ""
     /** @type {Array<import('$lib/data.d.ts').UserInfo>} */
     let users = data.users
+    /** @type {Array<import('$lib/data.d.ts').TaskInfo>} */
     let tasks = data.tasks
     let cards = data.cards
     /** @type {number | null} */
@@ -41,6 +42,29 @@
     }
 
     /**
+     *
+     * @param {any} tsk
+     */
+    function putTask(tsk) {
+        let found = false
+        tasks = tasks.map(task => {
+            if (task.id === tsk.id) {
+                task = {...task, ...tsk.evt}
+                found = true
+            }
+            return task
+        })
+        if (!found) {
+            tasks.push({
+                id: tsk.id,
+                name: tsk.evt.name,
+                no: tsk.evt.no
+            })
+        }
+        tasks = tasks
+    }
+
+    /**
      * @typedef {import('$lib/network.d.ts').RoomEvent} RoomEvent
      * @param {RoomEvent} update
      */
@@ -50,16 +74,34 @@
             const usr = update.evt.user
             putUser(usr);
         }
+        if (update.evt.task) {
+            /** @type any */
+            const tsk = update.evt.task
+            putTask(tsk);
+        }
     }
 
     function addTask() {
+        let no;
+        let name;
+        console.log(data.roomInfo)
         if (data.roomInfo.taskRegex) {
-            const regex = new RegExp(data.roomInfo.taskRegex)
+            const matchs = newTask.trim().match(data.roomInfo.taskRegex)
+            console.log(matchs)
+            if (matchs) {
+                no = matchs[0]
+                name = newTask.trim()
+            } else {
+                name = newTask.trim()
+            }
+        } else {
+            name = newTask.trim()
         }
         fetch(`/rooms/${data.id}/tasks`, {
             method: "POST",
             body: JSON.stringify({
-
+                no,
+                name
             })
         })
     }
@@ -146,7 +188,7 @@
     {#if tasks.length > 0}
         {#each tasks as task}
             <tr>
-                <td>{task.no}</td>
+                <td>{task.no ?? ""}</td>
                 <td>{task.name}</td>
                 <td style="text-align: center">{task.vote ?? '?'}</td>
             </tr>
