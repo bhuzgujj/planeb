@@ -1,8 +1,14 @@
-import {CardSet, RoomInfo} from "./data";
+import {Card, CardSet, RoomInfo} from "./data";
 
-export type ListenerType = "list" | "room" | "user" | "sets" | "tasks"
+export type ListenerType = "list" | "room" | "sets"
 export type EventTypes = ListEvent | RoomEvent | SetsEvent
 export type CrudAction = "add" | "update" | "remove"
+export type Vote = {
+    roomId: string,
+    card: Card,
+    userId: string,
+    tasksId: string,
+}
 export type ListEvent = {
     action: CrudAction,
     id: string,
@@ -20,12 +26,18 @@ export type RoomEvent = {
         task?: {
             action: CrudAction,
             id: string,
-            evt: {
+            evt?: {
                 no?: string;
                 name?: string;
                 comments?: string;
                 vote?: string;
             }
+        },
+        voting?: {
+            taskId: string,
+            voted?: {
+                [id: string]: string
+            },
         }
     }
 }

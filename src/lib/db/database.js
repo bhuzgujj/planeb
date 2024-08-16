@@ -77,7 +77,7 @@ async function executeQuery(path, query, dataFiller) {
      */
     let db
     try {
-        db = new Database(path);
+        db = new Database(path, { verbose: logger.debug });
         db.exec(sql)
         if (dataFiller) {
             dataFiller(db)
@@ -98,8 +98,7 @@ async function executeQuery(path, query, dataFiller) {
 function fillState(dir, fileName) {
     if (!fileName.endsWith(".db"))
         return
-    logger.debug(`Room found: ${dir}/${fileName}`)
-    let db = new Database(`${dir}/${fileName}`)
+    let db = new Database(`${dir}/${fileName}`, { verbose: logger.debug })
     try {
         let prep = db.prepare("select * from metadatas where keys = ?")
         let name = prep.get(ls.rooms.dbMetadata.name)
@@ -136,15 +135,13 @@ export async function createCardSet(id, cardSet) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
     try {
-        logger.debug(`Initializing card set...`);
-        db = new Database(dbPath);
+        db = new Database(dbPath, { verbose: logger.debug });
         const set = db.prepare("insert into cards_set (id, names) values (?, ?);")
         set.run(id, cardSet.name);
         for (const card of cardSet.cards) {
             const c = db.prepare("insert into cards (id, val, label, cards_set_id) values (?, ?, ?, ?);")
             c.run(card.id, card.value, card.label, id);
         }
-        logger.debug(`card set initialized`)
         cardsSet.set(id, cardSet);
     } catch (e) {
         logger.error(`card set failed initialized: ${e}`)
@@ -164,8 +161,7 @@ export async function modifyCardSet(id, cardSet) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
     try {
-        logger.debug(`Modifying card set...`);
-        db = new Database(dbPath);
+        db = new Database(dbPath, { verbose: logger.debug });
         db.prepare("update cards_set set names = ? where id = ?;")
             .run(cardSet.name, id);
         for (const card of cardSet.cards) {
@@ -176,7 +172,6 @@ export async function modifyCardSet(id, cardSet) {
                     .run(card.id, card.value, card.label, id);
             }
         }
-        logger.debug(`card set Modifyed`)
         cardsSet.set(id, cardSet);
     } catch (e) {
         logger.error(`card set failed modification: ${e}`)
@@ -188,11 +183,41 @@ export async function modifyCardSet(id, cardSet) {
 }
 
 /**
+ * Vote in a room
+ * @param {import("$lib/network.js").Vote} vote
+ * @return {Promise<void>}
+ */
+export async function vote(vote) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        const exist = db.prepare("update votes set card_id = ? where user_id = ? and task_id = ?;")
+            .run(vote.card, vote.userId, vote.tasksId)
+        if (exist.changes === 0) {
+            db.prepare("insert into votes(user_id, task_id, card_id) values(?, ?, ?);").run(vote.userId, vote.tasksId, vote.card)
+        }
+    } catch (e) {
+        logger.error(`"${vote.roomId}:${vote.userId}" database failed to add a vote ${vote}: ${e}`)
+    }
+}
+
+export async function acceptVote(vote) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("update tasks set card_id = ? where id = ?;")
+            .run(vote.card, vote.tasksId)
+    } catch (e) {
+        logger.error(`"${vote.roomId}:${vote.userId}" database failed to add a vote ${vote}: ${e}`)
+    }
+}
+
+/**
  * Create a room
  * @param {string} name
  * @param {boolean} isPersisted
  * @param {{id: string, name: string}} moderator
- * @param {CardSet}cards
+ * @param {CardSet} cards
  * @param {string} taskRegex
  * @return {Promise<string>}
  */

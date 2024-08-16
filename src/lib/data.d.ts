@@ -44,4 +44,4 @@ export type Card = {
     label: string
 }
 
-export type Query = "init" | "create_room"
+export type Query = "init" | "create_room" | "connections"

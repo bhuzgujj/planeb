@@ -13,8 +13,14 @@ let socket;
 /** @type {Array<{listener: NetCallback, type: ListenerType}>} */
 let listeners = []
 let retries = 0;
+let logging = false;
 
-function init() {
+/**
+ *
+ * @param {boolean} shouldLog
+ */
+function init(shouldLog) {
+    logging = shouldLog;
     if (socket || retries > 3) {
         return
     }
@@ -24,7 +30,8 @@ function init() {
         if (!socket)
             throw new Error("WebSocket not initialized");
         socket.onmessage = (event) => {
-            console.log(`Received from websocket: ${event.data}`);
+            if (logging)
+                console.log(`Received from websocket: ${event.data}`);
             let events = JSON.parse(event.data);
             for (const l of listeners) {
                 if (events.type === l.type) {
@@ -34,7 +41,7 @@ function init() {
         }
         socket.onclose = () => {
             socket = null
-            init()
+            init(shouldLog)
         }
         socket.onerror = (err) => {
             console.error(err)
@@ -68,8 +75,13 @@ function stopListening(listener, subMsg) {
     }
 }
 
+function send(data, type) {
+    socket.send(JSON.stringify({ type, data }))
+}
+
 export default {
     init,
     listenToUpdate,
     stopListening,
+    send
 }

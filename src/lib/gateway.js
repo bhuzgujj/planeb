@@ -2,7 +2,6 @@ import * as db from './db/database.js';
 import * as ws from './net/websocket.js';
 import logger from "$lib/logger.js";
 import {putUserInRoom} from "./db/database.js";
-import {notify} from "./net/websocket.js";
 
 /**
  * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
@@ -50,35 +49,34 @@ export function createRoom(name, isPersisted, moderator, cards, taskPrefix) {
 }
 
 /**
- * Add a user to specific rooms than notify those rooms
- * @param {Set<String>}roomAdded
- * @param {string} id
- * @param {string} name
- * @returns {Promise<void>}
- */
-export function addUserToRoom(roomAdded, id, name) {
-    let executions = [];
-    for (const roomId of roomAdded.values()) {
-        executions.push(putUserInRoom({id, names: name}, roomId))
-    }
-    return Promise.all(executions)
-        .then(() => ws.notify({evt: {user: {id, name}}, action: "update"}, "room", roomAdded))
-        .catch(e => logger.error("Error mid promises: " + e))
-}
-
-/**
  * Change name
  * @param {string} id
  * @param {string} name
  */
 export function changeName(id, name) {
-    /** @type {Set<string>} */
     let roomSubscribed = ws.getSubscribedRoom(id)
-    if (roomSubscribed.size < 1) {
+    if (!roomSubscribed || roomSubscribed.length === 0) {
         logger.warn("No room subed for userid: " + id)
         return;
     }
     return addUserToRoom(roomSubscribed, id, name);
+}
+
+/**
+ * Add a user to specific rooms than notify those rooms
+ * @param {string[]} roomAdded
+ * @param {string} id
+ * @param {string} name
+ * @returns {Promise<void>}
+ */
+export function addUserToRoom(roomAdded, id, name) {
+    const executions = []
+    for (const room of roomAdded) {
+        executions.push(putUserInRoom({id, names: name}, room))
+    }
+    return Promise.all(executions)
+        .then(() => ws.notify({evt: {user: {id, name}}, action: "update"}, "room", roomAdded))
+        .catch(e => logger.error("Error mid promises: " + e))
 }
 
 /**
@@ -87,7 +85,7 @@ export function changeName(id, name) {
  * @param {ListenerType} type
  */
 export function updateList(evt, type) {
-    return ws.notify(evt, type, new Set())
+    return ws.notify(evt, type, [])
 }
 
 /**
@@ -144,7 +142,7 @@ export async function createCardSet(name) {
         action: "add",
         id,
         evt: set
-    }, "sets", new Set())
+    }, "sets", [])
 }
 
 /**
@@ -160,7 +158,7 @@ export async function modifySet(id, cardSet) {
         action: "update",
         id,
         evt: cardSet
-    }, "sets", new Set())
+    }, "sets", [])
 }
 
 /**
@@ -171,8 +169,6 @@ export async function modifySet(id, cardSet) {
  */
 export async function addTaskToRoom(task, roomId) {
     const id = await db.addTaskToRoom(task, roomId)
-    const rooms = new Set()
-    rooms.add(roomId)
     /** @type {import("$lib/network.js").RoomEvent} */
     const evt = {
         evt: {
@@ -186,5 +182,47 @@ export async function addTaskToRoom(task, roomId) {
             }
         }
     };
+    const rooms = []
+    rooms.push(roomId)
     await ws.notify(evt, "room", rooms)
+}
+
+/**
+ * Vote in a room
+ * @param {import("$lib/network.js").Vote} vote
+ * @return {Promise<void>}
+ */
+export async function votes(vote) {
+    const dbExec = db.vote(vote)
+    const cache = ws.vote(vote)
+    ws.notify({
+        evt: {
+            user: {
+                id: vote.userId,
+                vote: vote.card
+            },
+        }
+    }, "room", [vote.roomId])
+    await Promise.all([dbExec, cache])
+}
+
+/**
+ * Vote in a room
+ * @param {import("$lib/network.js").Vote} vote
+ * @return {Promise<void>}
+ */
+export async function acceptVote(vote) {
+    const dbExec = db.acceptVote(vote)
+    ws.notify({
+        evt: {
+            task: {
+                action: "update",
+                id: vote.tasksId,
+                evt: {
+                    vote: vote.card
+                }
+            },
+        }
+    }, "room", [vote.roomId])
+    await Promise.all([dbExec])
 }
