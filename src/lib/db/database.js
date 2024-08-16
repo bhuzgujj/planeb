@@ -3,16 +3,17 @@ import {queries} from "$lib/db/queries.js";
 import logger from "$lib/logger.js";
 import {DATABASE, DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
-
+import ls from "../../constant.js";
 
 /**
- * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
  * @typedef {import('$lib/data.d.ts').UserInfo} UserInfo
  * @typedef {import('$lib/data.d.ts').TaskInfo} TaskInfo
  * @typedef {import('$lib/data.d.ts').DbUser} DbUser
  * @typedef {import('$lib/data.d.ts').Query} Query
  * @typedef {import('$lib/data.d.ts').CardSet} CardSet
  * @typedef {import('$lib/data.d.ts').Card} Card
+ * @typedef {import('$lib/data.d.ts').Room} Room
  *
  * @typedef {import('$lib/config.js').DatabaseConfig} DatabaseConfig
  */
@@ -76,7 +77,7 @@ async function executeQuery(path, query, dataFiller) {
      */
     let db
     try {
-        db = new Database(path);
+        db = new Database(path, { verbose: logger.debug });
         db.exec(sql)
         if (dataFiller) {
             dataFiller(db)
@@ -97,13 +98,13 @@ async function executeQuery(path, query, dataFiller) {
 function fillState(dir, fileName) {
     if (!fileName.endsWith(".db"))
         return
-    logger.debug(`Room found: ${dir}/${fileName}`)
-    let db = new Database(`${dir}/${fileName}`)
+    let db = new Database(`${dir}/${fileName}`, { verbose: logger.debug })
     try {
         let prep = db.prepare("select * from metadatas where keys = ?")
-        let name = prep.get("name")
-        let presisted = prep.get("is_persisted")
-        let owner = prep.get("owner")
+        let name = prep.get(ls.rooms.dbMetadata.name)
+        let presisted = prep.get(ls.rooms.dbMetadata.presisted)
+        let owner = prep.get(ls.rooms.dbMetadata.owner)
+        let taskPrefix = prep.get(ls.rooms.dbMetadata.taskRegex)
         db.close()
         if (!presisted || !presisted?.vals) {
             logger.debug(`Deleting room: ${dir}/${fileName}`)
@@ -112,7 +113,8 @@ function fillState(dir, fileName) {
             rooms.set(fileName.substring(0, fileName.length - 3), {
                 name: name.vals,
                 isPersisted: presisted?.vals,
-                owner: owner?.vals ?? ""
+                owner: owner?.vals ?? "",
+                taskRegex: taskPrefix?.vals,
             });
         }
     } catch (e) {
@@ -133,15 +135,13 @@ export async function createCardSet(id, cardSet) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
     try {
-        logger.debug(`Initializing card set...`);
-        db = new Database(dbPath);
+        db = new Database(dbPath, { verbose: logger.debug });
         const set = db.prepare("insert into cards_set (id, names) values (?, ?);")
         set.run(id, cardSet.name);
         for (const card of cardSet.cards) {
             const c = db.prepare("insert into cards (id, val, label, cards_set_id) values (?, ?, ?, ?);")
             c.run(card.id, card.value, card.label, id);
         }
-        logger.debug(`card set initialized`)
         cardsSet.set(id, cardSet);
     } catch (e) {
         logger.error(`card set failed initialized: ${e}`)
@@ -161,8 +161,7 @@ export async function modifyCardSet(id, cardSet) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
     try {
-        logger.debug(`Modifying card set...`);
-        db = new Database(dbPath);
+        db = new Database(dbPath, { verbose: logger.debug });
         db.prepare("update cards_set set names = ? where id = ?;")
             .run(cardSet.name, id);
         for (const card of cardSet.cards) {
@@ -173,7 +172,6 @@ export async function modifyCardSet(id, cardSet) {
                     .run(card.id, card.value, card.label, id);
             }
         }
-        logger.debug(`card set Modifyed`)
         cardsSet.set(id, cardSet);
     } catch (e) {
         logger.error(`card set failed modification: ${e}`)
@@ -185,23 +183,56 @@ export async function modifyCardSet(id, cardSet) {
 }
 
 /**
+ * Vote in a room
+ * @param {import("$lib/network.js").Vote} vote
+ * @return {Promise<void>}
+ */
+export async function vote(vote) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        const exist = db.prepare("update votes set card_id = ? where user_id = ? and task_id = ?;")
+            .run(vote.card, vote.userId, vote.tasksId)
+        if (exist.changes === 0) {
+            db.prepare("insert into votes(user_id, task_id, card_id) values(?, ?, ?);").run(vote.userId, vote.tasksId, vote.card)
+        }
+    } catch (e) {
+        logger.error(`"${vote.roomId}:${vote.userId}" database failed to add a vote ${vote}: ${e}`)
+    }
+}
+
+export async function acceptVote(vote) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("update tasks set card_id = ? where id = ?;")
+            .run(vote.card, vote.tasksId)
+    } catch (e) {
+        logger.error(`"${vote.roomId}:${vote.userId}" database failed to add a vote ${vote}: ${e}`)
+    }
+}
+
+/**
  * Create a room
  * @param {string} name
  * @param {boolean} isPersisted
  * @param {{id: string, name: string}} moderator
- * @param {CardSet}cards
+ * @param {CardSet} cards
+ * @param {string} taskRegex
  * @return {Promise<string>}
  */
-export async function createRoom(name, isPersisted, moderator, cards) {
+export async function createRoom(name, isPersisted, moderator, cards, taskRegex) {
     const roomId = crypto.randomUUID();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
         logger.debug(`Initializing database "${roomId}:${name}"...`);
         await executeQuery(dbPath, "create_room", db => {
             const md = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
-            md.run("name", name);
-            md.run("is_persisted", isPersisted);
-            md.run("owner", moderator.id);
+            md.run(ls.rooms.dbMetadata.name, name);
+            md.run(ls.rooms.dbMetadata.presisted, isPersisted);
+            md.run(ls.rooms.dbMetadata.owner, moderator.id);
+            if (taskRegex)
+                md.run(ls.rooms.dbMetadata.taskRegex, taskRegex);
             const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 1);")
             mod.run(moderator.id, moderator.name);
             const card = db.prepare("insert into cards (id, val, label) values (?, ?, ?);")
@@ -210,11 +241,47 @@ export async function createRoom(name, isPersisted, moderator, cards) {
             }
         })
         logger.debug(`"${roomId}:${name}" database initialized`)
-        rooms.set(roomId, {name: name, isPersisted: isPersisted, owner: moderator.id});
+        rooms.set(roomId, {
+            name: name,
+            isPersisted: isPersisted,
+            owner: moderator.id,
+            taskRegex: taskRegex
+        });
         return roomId.toString()
     } catch (e) {
         logger.error(`"${roomId}:${name}" database failed initialized: ${e}`)
         return roomId.toString()
+    }
+}
+
+/**
+ * Add a task to a room
+ * @param {import("$lib/data.js").Task} task
+ * @param {string} roomId
+ * @returns {Promise<string>}
+ */
+export async function addTaskToRoom(task, roomId) {
+    const taskId = crypto.randomUUID();
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    let db;
+    try {
+        logger.debug(`"${roomId}:${task.name}" add a task: ${task}`)
+        db = new Database(dbPath)
+        if (task.no) {
+            db.prepare("insert into tasks (id, names) values (?, ?);")
+                .run(taskId, task.name)
+        } else {
+            db.prepare("insert into tasks (id, names, task_no) values (?, ?, ?);")
+                .run(taskId, task.name, task.no)
+        }
+        return taskId.toString()
+    } catch (e) {
+        logger.error(`"${roomId}:${task.name}" failed to add a task: ${e}`)
+        return taskId.toString()
+    } finally {
+        if (db) {
+            db.close()
+        }
     }
 }
 
@@ -228,6 +295,7 @@ export async function putUserInRoom(user, roomId) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     let db;
     try {
+        logger.debug(`Adding user into database "${roomId}:${user.names}"...`);
         db = new Database(dbPath);
         let users = db.prepare("select count(*) from users where id = ?;").get(user.id);
         if (users['count(*)'] > 0) {
@@ -239,14 +307,15 @@ export async function putUserInRoom(user, roomId) {
                 mod.run(user.names, user.id);
             }
         } else {
-            const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, ?, ?);")
-            mod.run(user.id, user.names, user.moderator);
+            const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 0);")
+            mod.run(user.id, user.names);
         }
         db.close()
     } catch (e) {
         if (db) {
             db.close()
         }
+        logger.error(`Error updating users from database: ${e}`)
         throw e
     }
 }
@@ -270,7 +339,7 @@ export function getRooms() {
 /**
  * Get room by id
  * @param {string} id
- * @return {{id: string, users: UserInfo[], tasks: TaskInfo[], roomInfo: RoomInfo}|null}
+ * @return {Room|null}
  */
 export function getRoomsById(id) {
     const roomInfo = rooms.get(id);
@@ -292,14 +361,30 @@ export function getRoomsById(id) {
         /** @type {Array<TaskInfo>} */
         let tasks = [];
         for (const task of db.prepare("select * from tasks;").iterate()) {
-            users.push(task)
+            tasks.push({
+                id: task.id,
+                name: task.names,
+                no: task.task_no,
+                comments: task.comments,
+                vote: task.card_id,
+            })
+        }
+        /** @type {Array<Card>} */
+        let cards = [];
+        for (const /** @type {{id: string, val: number, label: string}} */ card of db.prepare("select * from cards;").iterate()) {
+            cards.push({
+                id: card.id,
+                value: card.val,
+                label: card.label
+            })
         }
         db.close()
         return {
             id,
             roomInfo,
             users,
-            tasks
+            tasks,
+            cards
         };
     } catch (e) {
         logger.error(e)

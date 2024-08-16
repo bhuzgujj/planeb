@@ -1,22 +1,25 @@
 import {WebSocketServer} from "ws";
 import logger from "$lib/logger.js";
-import {putUserInRoom} from "$lib/db/database.js";
+import {addUserToRoom} from "$lib/gateway.js";
+import Database from "better-sqlite3";
+import {queries} from "$lib/db/queries.js";
 
 /**
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
- * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
+ * @typedef {import('$lib/network.d.ts').EventTypes} EventTypes
  * @typedef {import('$lib/network.d.ts').SetsEvent} SetsEvent
  * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
- * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomEvent
+ * @typedef {import('$lib/network.d.ts').RoomEvent} RoomEvent
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
- * @typedef {{socket: any, userId: string | undefined, focused: Set<string>, listed: boolean, setted: boolean}} ConnectionItem
- * @typedef {Map<string, ConnectionItem>} ConnectionPool
  */
+
+const db = new Database(":memory:", { verbose: logger.debug })
 
 /** @type {WebSocketServer | null} */
 let socket = null;
-/** @type {ConnectionPool}>} */
-const connectionsPool = new Map();
+/** @type {Map<string, {socket: any, ip: string}>} */
+const connectionPool = new Map();
 
 function init() {
     if (socket) {
@@ -26,6 +29,7 @@ function init() {
     socket = new WebSocketServer({
         port: 43594
     })
+    db.exec(queries.readQuery("connections"))
     /** @type {Promise<void>} */
     const creation = new Promise((resolve, reject) => {
         if (!socket)
@@ -33,17 +37,12 @@ function init() {
         try {
             socket.on("connection", (ws, req) => {
                 const id = crypto.randomUUID();
-                connectionsPool.set(id, {
-                    socket: ws,
-                    userId: undefined,
-                    focused: new Set(),
-                    listed: false,
-                    setted: false,
-                })
-                logger.debug(`Connection from ${ req.socket.remoteAddress}`)
+                db.prepare("insert into connections (id) values (?)").run(id)
+                connectionPool.set(id, {socket: ws, ip: req.socket.remoteAddress})
                 ws.on("message", onMessage(id))
                 ws.on("close", onClose(id))
                 ws.on("error", onError(id))
+                ws.send(JSON.stringify({ connectionId: id }))
             })
             logger.debug("Websocket initialized")
             resolve()
@@ -62,42 +61,70 @@ function init() {
  */
 function onMessage(id) {
     return (data) => {
-        /** @type {ConnectionItem | undefined} */
-        const connection = connectionsPool.get(id)
-        if (connection === undefined) {
-            return
-        }
-        /** @type {import("$lib/network.js").WebSocketRequest} */
-        const item = JSON.parse(data)
         logger.debug(`Message received from ${id} ${data}`)
-        if (item.focused?.id !== item.unfocused) {
-            if (item.focused) {
-                if (!connection.focused.has(item.focused.id)) {
-                    putUserInRoom({
-                        id: item.focused.user.id,
-                        names: item.focused.user.name
-                    }, item.focused.id)
+        /**
+         * @template {ListenerType} T
+         * @type {import("$lib/network.js").WebSocketRegisteringEvent<T>}
+         */
+        const item = JSON.parse(data)
+        /** @type {any} */
+        const evt = item.data
+        switch (item.type) {
+            case "list":
+                db.prepare("update connections set listed = ? where id = ?;").run(+evt, id)
+                break;
+            case "room":
+                /** @type {import("$lib/network.js").EventData<"room">} */
+                const room = evt
+                if (room.action === "remove") {
+                    db.prepare("update connections set rooms_id = null where id = ?;").run(id)
+                } else if (room.user) {
+                    const rooms = []
+                    rooms.push(room.roomId)
+                    addUserToRoom(rooms, item.userId, room.user.name)
                         .then(() => {
-                            if (item.focused?.id) {
-                                connection.focused.add(item.focused?.id)
+                            db.prepare("insert or ignore into rooms(id) values (?);").run(room.roomId)
+                            db.prepare("update connections set rooms_id = ? where id = ?;").run(room.roomId, id)
+                            const task = db.prepare("select * from rooms where id = ?;").get(room.roomId)
+                            const users = db.prepare("select * from users;").all()
+                            if (task.task) {
+                                notify({
+                                    evt: {
+                                        voting: {
+                                            taskId: task.task,
+                                            voted: users.reduce((acc, user) => {
+                                                acc[user.id] = user.vote
+                                                return acc
+                                            }, {})
+                                        }
+                                    }
+                                }, "room", [room.roomId])
                             }
                         })
                         .catch(logger.error)
+                } else {
+                    logger.warn("Cannot add or modify an non existing user")
                 }
-            }
-            if (item.unfocused) {
-                connection.focused.delete(item.unfocused)
-            }
+                break;
+            case "votes":
+                if (evt?.taskId !== undefined) {
+                    db.prepare("update users set vote = null;").run()
+                    db.prepare("update rooms set task = ? where id = ?;").run(evt.taskId, evt.roomId)
+                    notify({
+                        evt: {
+                            voting: {
+                                taskId: evt.taskId
+                            }
+                        }
+                    }, "room", [evt.roomId])
+                }
+                break;
+            case "sets":
+                db.prepare("update connections set setted = ? where id = ?;").run(+evt, id)
+                break;
         }
-        if (item.listed !== undefined) {
-            connection.listed = item.listed
-        }
-        if (item.setted !== undefined) {
-            connection.setted = item.setted
-        }
-        if (item.userId !== undefined) {
-            connection.userId = item.userId
-        }
+        db.prepare("insert or ignore into users(id) values (?);").run(item.userId)
+        db.prepare("update connections set users_id = ? where id = ?;").run(item.userId, id)
     }
 }
 
@@ -108,8 +135,7 @@ function onMessage(id) {
  */
 function onClose(id) {
     return (data) => {
-        logger.debug(`Closing socket for ip ${id}`);
-        connectionsPool.delete(id)
+        db.prepare("delete from connections where id = ?;").run(id)
     }
 }
 
@@ -120,95 +146,86 @@ function onClose(id) {
  */
 function onError(id) {
     return (data) => {
-        logger.error(data)
+        logger.warn(`Error on connection id ${id} : ${data}`)
     }
 }
 
 /**
  *
- * @param {string} id
- * @param {string} name
+ * @param {string} userId
+ * @return {string[] | undefined}
  */
-export async function changeName(id, name) {
-    /** @type {Set<string>} */
-    let roomSubscribed = new Set();
-    for (const connection of connectionsPool.values()) {
-        if (connection.userId === id) {
-            roomSubscribed = connection.focused
-            break;
-        }
-    }
-    if (roomSubscribed.size < 1) {
-        logger.warn("No room subed for userid: " + id)
-        return;
-    }
-    let executions = [];
-    for (const roomId of roomSubscribed.values()) {
-        executions.push(putUserInRoom({id, names: name}, roomId))
-    }
-    return Promise.all(executions)
-        .then(() => {
-            for (const connection of connectionsPool.values()) {
-                for (const roomId of roomSubscribed.values()) {
-                    if (connection.focused.has(roomId)) {
-                        const msg = {
-                            type: "user",
-                            update: {
-                                id,
-                                evt: {
-                                    name
-                                }
-                            }
-                        }
-                        connection.socket.send(JSON.stringify(msg))
-                        break;
+export function getSubscribedRoom(userId) {
+    const connections = db.prepare("select rooms_id from connections where users_id = ?;").all(userId)
+    return connections?.map(rooms => rooms.rooms_id)
+}
+
+/**
+ * @param {EventTypes} evt
+ * @param {ListenerType} type
+ * @param {string[]} roomIds
+ */
+export function notify(evt, type, roomIds) {
+    logger.info(`Broadcasting: ${JSON.stringify(evt)}`)
+    let connectionIds;
+    switch (type) {
+        case "list":
+            connectionIds = db.prepare("select id from connections where listed = ?;").all(1)
+            if (connectionIds) {
+                for (const {id} of connectionIds) {
+                    logger.info(`Sending to ${id}:${connectionPool.get(id)?.ip}`)
+                    connectionPool.get(id)?.socket?.send(JSON.stringify({
+                        type,
+                        update: evt
+                    }))
+                }
+            }
+            break
+        case "sets":
+            connectionIds = db.prepare("select id from connections where setted = ?;").all(1)
+            if (connectionIds) {
+                for (const {id} of connectionIds) {
+                    logger.info(`Sending to ${id}:${connectionPool.get(id)?.ip}`)
+                    connectionPool.get(id)?.socket?.send(JSON.stringify({
+                        type,
+                        update: evt
+                    }))
+                }
+            }
+            break
+        case "room":
+            for (const roomId of roomIds) {
+                connectionIds = db.prepare("select id from connections where rooms_id = ?;").all(roomId)
+                if (connectionIds) {
+                    for (const {id} of connectionIds) {
+                        logger.info(`Sending to ${id}:${connectionPool.get(id)?.ip}`)
+                        connectionPool.get(id)?.socket?.send(JSON.stringify({
+                            type,
+                            update: evt
+                        }))
                     }
                 }
             }
-        })
-        .catch(e => logger.error("Error mid promises: " + e))
-}
-
-/**
- *
- * @param {ListEvent | RoomEvent | SetsEvent} evt
- * @param {ListenerType} type
- */
-export function updateList(evt, type) {
-    logger.debug(`Broadcasting to WebSocket: ${JSON.stringify(evt)}`)
-    for (const [ip, connection] of connectionsPool.entries()) {
-        switch (type) {
-            case "list":
-                if (connection.listed) {
-                    logger.debug(`Sending to ${ip}`)
-                    connection.socket.send(JSON.stringify({
-                        type,
-                        update: evt
-                    }))
-                }
-                break
-            case "sets":
-                if (connection.setted) {
-                    logger.debug(`Sending to ${ip}`)
-                    connection.socket.send(JSON.stringify({
-                        type,
-                        update: evt
-                    }))
-                }
-                break
-            default:
-                logger.debug(`Recieved ${type}: ${evt}`)
-                break
-        }
+            break
     }
 }
 
+/**
+ * Vote in a room
+ * @param {import("$lib/network.js").Vote} vote
+ * @return {Promise<void>}
+ */
+export async function vote(vote) {
+    db.prepare("update users set vote = ? where id = ?;").run(vote.card, vote.userId)
+}
+
 function close() {
-    for (const connection of connectionsPool.values())
-        connection.socket.close()
+    for (const connection of connectionPool.values())
+        connection?.close()
     socket?.close(() => {
         socket = null
     })
+    db.close()
 }
 
 export default {

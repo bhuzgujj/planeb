@@ -1,7 +1,15 @@
-export type ListInfo = {
+export type RoomInfo = {
     name: string;
     isPersisted: boolean;
     owner: string;
+    taskRegex?: string;
+}
+export type Room = {
+    id: string,
+    users: UserInfo[],
+    tasks: TaskInfo[],
+    cards: Card[],
+    roomInfo: RoomInfo
 }
 export type UserInfo = {
     id: string;
@@ -15,11 +23,16 @@ export type DbUser = {
     moderator: number;
 }
 export type TaskInfo = {
-    no: string;
+    id: string;
+    no?: string;
     name: string;
-    vote: string;
+    comments?: string;
+    vote?: string;
 }
-
+export type Task = {
+    name: string,
+    no?: string
+}
 export type CardSet = {
     name: string;
     cards: Array<Card>
@@ -31,4 +44,4 @@ export type Card = {
     label: string
 }
 
-export type Query = "init" | "create_room"
+export type Query = "init" | "create_room" | "connections"

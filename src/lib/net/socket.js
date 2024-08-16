@@ -1,12 +1,9 @@
 /**
- * @typedef {import('$lib/data.d.ts').ListInfo} RoomInfo
+ * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
  *
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
  * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
- * @typedef {import('$lib/network.d.ts').UserEvent} UserEvent
- * @typedef {import('$lib/network.d.ts').RoomModificationEvent} RoomModificationEvent
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
- * @typedef {import('$lib/network.d.ts').WebSocketRequest} SubscribeMessage
  *
  * @typedef {import('$lib/network.d.ts').NetCallback} NetCallback
  */
@@ -15,18 +12,26 @@
 let socket;
 /** @type {Array<{listener: NetCallback, type: ListenerType}>} */
 let listeners = []
+let retries = 0;
+let logging = false;
 
-function init() {
-    if (socket) {
+/**
+ *
+ * @param {boolean} shouldLog
+ */
+function init(shouldLog) {
+    logging = shouldLog;
+    if (socket || retries > 3) {
         return
     }
+    retries++
     socket = new WebSocket("ws://localhost:43594/");
     socket.onopen = () => {
         if (!socket)
             throw new Error("WebSocket not initialized");
-        console.log("Socket opened");
         socket.onmessage = (event) => {
-            console.log(`Received from websocket: ${event.data}`);
+            if (logging)
+                console.log(`Received from websocket: ${event.data}`);
             let events = JSON.parse(event.data);
             for (const l of listeners) {
                 if (events.type === l.type) {
@@ -34,12 +39,20 @@ function init() {
                 }
             }
         }
+        socket.onclose = () => {
+            socket = null
+            init(shouldLog)
+        }
+        socket.onerror = (err) => {
+            console.error(err)
+        }
     }
 }
 
 /**
+ @template {ListenerType} T
  * @param {NetCallback} listener
- * @param {SubscribeMessage} subMsg
+ * @param {import('$lib/network.d.ts').WebSocketRegisteringEvent<T>} subMsg
  */
 function listenToUpdate(listener, subMsg) {
     listeners.push({listener, type: subMsg.type})
@@ -50,8 +63,9 @@ function listenToUpdate(listener, subMsg) {
 }
 
 /**
+ * @template {ListenerType} T
  * @param {NetCallback} listener
- * @param {SubscribeMessage} subMsg
+ * @param {import('$lib/network.d.ts').WebSocketRegisteringEvent<T>} subMsg
  */
 function stopListening(listener, subMsg) {
     listeners = listeners.filter((l) => l.listener !== listener)
@@ -61,8 +75,13 @@ function stopListening(listener, subMsg) {
     }
 }
 
+function send(data, type) {
+    socket.send(JSON.stringify({ type, data }))
+}
+
 export default {
     init,
     listenToUpdate,
     stopListening,
+    send
 }

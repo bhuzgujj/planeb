@@ -1,14 +1,15 @@
 <script>
     import {goto} from "$app/navigation";
 
-    /** */
+    /** @type {import('./$types').PageData} */
     export let data;
 
-    /** @type {{[id: string]: {value: string, label: string}}} */
-    let cards = data.cardSet.cards.reduce((/** @type {{[id: string]: {value: string, label: string}}} */ acc, /** @type {import('$lib/data.d.ts').Card} */ prev) => {
+    /** @type {{[id: string]: {value: string, label: string, sync: boolean}}} */
+    let cards = data.cardSet.cards.reduce((/** @type {{[id: string]: {value: string, label: string, sync: boolean}}} */ acc, /** @type {import('$lib/data.d.ts').Card} */ prev) => {
         acc[prev.id] = {
             value: prev.value.toString(),
-            label: prev.label
+            label: prev.label,
+            sync: false
         }
         return acc
     }, {});
@@ -47,7 +48,7 @@
     Set Name: <input type="text" bind:value={name}/>
 </label>
 <p>Cards:</p>
-<button on:click={() => {cards[crypto.randomUUID()] = {label:"", value: "0"}}}>Add</button>
+<button on:click={() => {cards[crypto.randomUUID()] = {label:"", value: "0", sync: true}}}>Add</button>
 <table style="width: 100%">
     <tr>
         <th>Control</th>
@@ -56,17 +57,21 @@
     </tr>
     {#if Object.keys(cards).length>0}
         {#each Object.keys(cards) as card}
-            <tr style="vertical-align: center">
+            <tr>
                 <td><button class="bdel" on:click={() => {
                         delete cards[card]
                         cards = cards
                     }} disabled={Object.keys(cards).length <= 2}>Remove</button></td>
-                <td><input bind:value={cards[card].value}></td>
-                <td><input bind:value={cards[card].label}></td>
+                <td><input bind:value={cards[card].value} on:input={(e) => {
+                    if (cards[card].sync){
+                        cards[card].label = cards[card].value
+                    }
+                }}></td>
+                <td><input bind:value={cards[card].label} on:input={(e) => {cards[card].sync = false}}></td>
             </tr>
         {/each}
     {:else}
-        <tr style="vertical-align: center">
+        <tr>
             <td style="text-align: center;" colspan="3">Empty</td>
         </tr>
     {/if}

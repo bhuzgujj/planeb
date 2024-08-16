@@ -2,6 +2,14 @@ const ls = {
     itemKeys: {
         id: "planeb.id",
         name: "planeb.name",
+    },
+    rooms: {
+        dbMetadata: {
+            taskRegex: "task_number_regex",
+            owner: "owner",
+            presisted: "is_persisted",
+            name: "name",
+        }
     }
 }
 

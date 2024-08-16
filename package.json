@@ -22,6 +22,7 @@
 	"type": "module",
 	"dependencies": {
 		"better-sqlite3": "^11.1.2",
+		"d3-scale": "^4.0.2",
 		"ws": "^8.18.0"
 	}
 }
