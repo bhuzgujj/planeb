@@ -201,6 +201,11 @@ export async function vote(vote) {
     }
 }
 
+/**
+ * Set final vote on a task
+ * @param {import("$lib/network.js").AcceptedVote} vote
+ * @return {Promise<void>}
+ */
 export async function acceptVote(vote) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
     try {
@@ -208,7 +213,7 @@ export async function acceptVote(vote) {
         db.prepare("update tasks set card_id = ? where id = ?;")
             .run(vote.card, vote.tasksId)
     } catch (e) {
-        logger.error(`"${vote.roomId}:${vote.userId}" database failed to add a vote ${vote}: ${e}`)
+        logger.error(`"${vote.roomId}:${vote.tasksId}" database failed to add a vote ${vote.card}: ${e}`)
     }
 }
 

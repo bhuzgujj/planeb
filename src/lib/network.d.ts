@@ -1,12 +1,18 @@
-import {Card, CardSet, RoomInfo} from "./data";
+import {CardSet, RoomInfo} from "./data";
 
 export type ListenerType = "list" | "room" | "sets"
+export type MessageType = "votes"
 export type EventTypes = ListEvent | RoomEvent | SetsEvent
 export type CrudAction = "add" | "update" | "remove"
 export type Vote = {
     roomId: string,
-    card: Card,
+    card: string,
     userId: string,
+    tasksId: string,
+}
+export type AcceptedVote = {
+    roomId: string,
+    card: string,
     tasksId: string,
 }
 export type ListEvent = {
@@ -46,7 +52,7 @@ export type SetsEvent = {
     id: string,
     evt: CardSet
 }
-type EventData<T extends ListenerType> =
+type EventData<T extends ListenerType | MessageType> =
     T extends "room" ? {
             user: {
                 name: string
@@ -54,8 +60,17 @@ type EventData<T extends ListenerType> =
             roomId: string,
             action: CrudAction,
         }
+    : T extends "votes" ? {
+            taskId: string,
+            roomId: string,
+        }
     : boolean
 export type WebSocketRegisteringEvent<T extends ListenerType> = {
+    type: T,
+    userId: string,
+    data: EventData<T>
+}
+export type WebSocketMessageEvent<T extends ListenerType | MessageType> = {
     type: T,
     userId: string,
     data: EventData<T>

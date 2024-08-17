@@ -208,7 +208,7 @@ export async function votes(vote) {
 
 /**
  * Vote in a room
- * @param {import("$lib/network.js").Vote} vote
+ * @param {import("$lib/network.js").AcceptedVote} vote
  * @return {Promise<void>}
  */
 export async function acceptVote(vote) {

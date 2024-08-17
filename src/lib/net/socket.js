@@ -75,8 +75,17 @@ function stopListening(listener, subMsg) {
     }
 }
 
+/**
+ * Send message to the websocket
+ * @param {any} data
+ * @param {import('$lib/network.d.ts').MessageType} type
+ */
 function send(data, type) {
-    socket.send(JSON.stringify({ type, data }))
+    if (socket) {
+        socket.send(JSON.stringify({ type, data }))
+    } else {
+        console.error("Websocket is not connected")
+    }
 }
 
 export default {
