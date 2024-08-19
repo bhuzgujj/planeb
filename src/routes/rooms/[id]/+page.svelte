@@ -1,5 +1,5 @@
 <script>
-    import ls from "../../../constant.js";
+    import constants from "../../../constant.js";
     import {onDestroy, onMount} from "svelte";
     import socket from "$lib/net/socket.js";
     import CommentModal from "../../../components/CommentModal.svelte";
@@ -290,12 +290,46 @@
     }
 
     function saveComment() {
-        closeDialog()
+        const task = tasks.find(task => task.id === taskCommenting)
+        if (task) {
+            fetch(`/rooms/${data.id}/tasks/${task.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    comment: comments
+                })
+            });
+            closeDialog()
+        } else {
+            console.error("Cannot save comment to a non existing task")
+        }
+    }
+
+    /**
+     *
+     * @param {import("$lib/data.js").UserInfo} user
+     */
+    function toggleMod(user) {
+        fetch(`/rooms/${data.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                userId: user.id,
+                moderator: !user.moderator
+            })
+        })
+    }
+
+    /**
+     *
+     * @param {import("$lib/data.js").UserInfo} user
+     */
+    function canActOn(user) {
+        return isMod && data.roomInfo.owner !== user.id && user.id !== userId
     }
 
     onMount(() => {
-        userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        userName = localStorage.getItem(ls.itemKeys.name) ?? ""
+        console.log(data)
+        userId = localStorage.getItem(constants.localStorageKeys.id) ?? ""
+        userName = localStorage.getItem(constants.localStorageKeys.name) ?? ""
         /** @type {import('$lib/network.d.ts').WebSocketRegisteringEvent<"room">} */
         let subMsg = {
             type: "room",
@@ -369,7 +403,7 @@
                             <td style="width: 80%">{user.name}</td>
                             <td style="text-align: center">?</td>
                             <td style="text-align: center; vertical-align: center">
-                                <input type="checkbox" disabled={!isMod}>
+                                <input type="checkbox" checked={user.moderator} disabled={!canActOn(user)} on:click={() => toggleMod(user)}>
                             </td>
                         </tr>
                     {:else if user.vote !== null && user.vote !== undefined}
@@ -377,7 +411,7 @@
                             <td style="width: 80%">{user.name}</td>
                             <td style="text-align: center">{showVote(user)}</td>
                             <td style="text-align: center; vertical-align: center">
-                                <input type="checkbox" disabled={!isMod}>
+                                <input type="checkbox" checked={user.moderator} disabled={!canActOn(user)} on:click={() => toggleMod(user)}>
                             </td>
                         </tr>
                     {:else }
@@ -385,7 +419,7 @@
                             <td style="width: 80%">{user.name}</td>
                             <td style="text-align: center">?</td>
                             <td style="text-align: center; vertical-align: center">
-                                <input type="checkbox" disabled={!isMod}>
+                                <input type="checkbox" checked={user.moderator} disabled={!canActOn(user)} on:click={() => toggleMod(user)}>
                             </td>
                         </tr>
                     {/if}

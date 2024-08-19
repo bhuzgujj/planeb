@@ -1,5 +1,5 @@
 import socket from "$lib/net/socket.js";
-import ls from "./constant.js";
+import constants from "./constant.js";
 import {createId} from "./idGenerator.js";
 
 let started = false;
@@ -12,12 +12,12 @@ function start() {
     started = true;
     console.log("Starting");
 
-    if (!localStorage.getItem(ls.itemKeys.id)) {
-        localStorage.setItem(ls.itemKeys.id, createId().toString())
+    if (!localStorage.getItem(constants.localStorageKeys.id)) {
+        localStorage.setItem(constants.localStorageKeys.id, createId().toString())
     }
 
-    if (!localStorage.getItem(ls.itemKeys.name)) {
-        localStorage.setItem(ls.itemKeys.name, "unknown")
+    if (!localStorage.getItem(constants.localStorageKeys.name)) {
+        localStorage.setItem(constants.localStorageKeys.name, "unknown")
     }
     socket.init(shouldLog)
     console.log("Started");

@@ -161,6 +161,11 @@ export async function modifySet(id, cardSet) {
     }, "sets", [])
 }
 
+/**
+ * Delete card set
+ * @param {string} id
+ * @return {Promise<void>}
+ */
 export async function deleteSet(id) {
     await db.deleteSet(id)
     await ws.notify({
@@ -213,6 +218,44 @@ export async function votes(vote) {
         }
     }, "room", [vote.roomId])
     await Promise.all([dbExec, cache])
+}
+
+/**
+ * Comment a task
+ * @param {import("$lib/network.js").Comment} comment
+ */
+export async function saveComment(comment) {
+    const dbExec = db.saveComment(comment)
+    ws.notify({
+        evt: {
+            task: {
+                action: "update",
+                id: comment.tasksId,
+                evt: {
+                    comments: comment.comment
+                }
+            },
+        }
+    }, "room", [comment.roomId])
+    await Promise.all([dbExec])
+}
+
+/**
+ * Make a mod of a user
+ * @param {{ userId: string, moderator: boolean, roomId }} mod
+ */
+export async function moderation(mod) {
+    const dbExec = db.moderation(mod)
+    ws.notify({
+        evt: {
+            user: {
+                action: "update",
+                id: mod.userId,
+                moderator: mod.moderator,
+            },
+        }
+    }, "room", [mod.roomId])
+    await Promise.all([dbExec])
 }
 
 /**

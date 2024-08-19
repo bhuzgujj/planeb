@@ -1,5 +1,5 @@
-const ls = {
-    itemKeys: {
+const constant = {
+    localStorageKeys: {
         id: "planeb.id",
         name: "planeb.name",
     },
@@ -13,4 +13,4 @@ const ls = {
     }
 }
 
-export default Object.freeze(ls)
+export default Object.freeze(constant)

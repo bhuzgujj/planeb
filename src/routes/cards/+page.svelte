@@ -1,7 +1,7 @@
 <script>
     import {goto} from "$app/navigation";
     import {onDestroy, onMount} from "svelte";
-    import ls from "../../constant.js";
+    import constants from "../../constant.js";
     import socket from "$lib/net/socket.js";
 
     /**
@@ -44,7 +44,7 @@
     }
 
     onMount(() => {
-        userId = localStorage.getItem(ls.itemKeys.id) ?? ""
+        userId = localStorage.getItem(constants.localStorageKeys.id) ?? ""
         socket.listen(onServerUpdate, {type: "sets", data: true, userId})
     })
 

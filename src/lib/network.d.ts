@@ -10,6 +10,11 @@ export type Vote = {
     userId: string,
     tasksId: string,
 }
+export type Comment = {
+    roomId: string,
+    comment: string,
+    tasksId: string,
+}
 export type AcceptedVote = {
     roomId: string,
     card: string,

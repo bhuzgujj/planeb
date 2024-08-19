@@ -1,7 +1,7 @@
 <script>
     import {enhance} from '$app/forms';
     import {goto} from "$app/navigation";
-    import ls from "../../../constant.js";
+    import constants from "../../../constant.js";
 
     /** @type {import('./$types').ActionData} */
     export let form;
@@ -19,8 +19,8 @@
         use:enhance={(res) => {
                 return async ({ result }) => {
                     if (result.type === 'success' && result?.data?.location) {
-                        const moderatorId = localStorage.getItem(ls.itemKeys.id)
-                        const moderatorName = localStorage.getItem(ls.itemKeys.name)
+                        const moderatorId = localStorage.getItem(constants.localStorageKeys.id)
+                        const moderatorName = localStorage.getItem(constants.localStorageKeys.name)
                         await fetch("/rooms", {
                             method: "POST",
                             body: JSON.stringify({

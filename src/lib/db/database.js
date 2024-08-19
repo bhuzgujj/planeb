@@ -3,8 +3,8 @@ import {queries} from "$lib/db/queries.js";
 import logger from "$lib/logger.js";
 import {DATABASE, DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
-import ls from "../../constant.js";
 import {createId} from "../../idGenerator.js";
+import constants from "../../constant.js";
 
 /**
  * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
@@ -102,10 +102,10 @@ function fillState(dir, fileName) {
     let db = new Database(`${dir}/${fileName}`, { verbose: logger.debug })
     try {
         let prep = db.prepare("select * from metadatas where keys = ?")
-        let name = prep.get(ls.rooms.dbMetadata.name)
-        let presisted = prep.get(ls.rooms.dbMetadata.presisted)
-        let owner = prep.get(ls.rooms.dbMetadata.owner)
-        let taskPrefix = prep.get(ls.rooms.dbMetadata.taskRegex)
+        let name = prep.get(constants.rooms.dbMetadata.name)
+        let presisted = prep.get(constants.rooms.dbMetadata.presisted)
+        let owner = prep.get(constants.rooms.dbMetadata.owner)
+        let taskPrefix = prep.get(constants.rooms.dbMetadata.taskRegex)
         db.close()
         if (!presisted || !presisted?.vals) {
             logger.debug(`Deleting room: ${dir}/${fileName}`)
@@ -235,6 +235,36 @@ export async function acceptVote(vote) {
     }
 }
 
+/**
+ * Make a mod of a user
+ * @param {{ userId: string, moderator: boolean, roomId }} mod
+ */
+export function moderation(mod) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${mod.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("update users set moderator = ? where id = ?;")
+            .run(+mod.moderator, mod.userId)
+    } catch (e) {
+        logger.error(`"${mod.roomId}:${mod.userId}" database failed to add a vote ${mod.moderator}: ${e}`)
+    }
+}
+
+/**
+ * Comment a task
+ * @param {import("$lib/network.js").Comment} comment
+ */
+export async function saveComment(comment) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${comment.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("update tasks set comments = ? where id = ?;")
+            .run(comment.comment, comment.tasksId)
+    } catch (e) {
+        logger.error(`"${comment.roomId}:${comment.tasksId}" database failed to add a vote ${comment.comment}: ${e}`)
+    }
+}
+
 export async function deleteTask(taskId, roomId) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
@@ -262,11 +292,11 @@ export async function createRoom(name, isPersisted, moderator, cards, taskRegex)
         logger.debug(`Initializing database "${roomId}:${name}"...`);
         await executeQuery(dbPath, "create_room", db => {
             const md = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
-            md.run(ls.rooms.dbMetadata.name, name);
-            md.run(ls.rooms.dbMetadata.presisted, isPersisted);
-            md.run(ls.rooms.dbMetadata.owner, moderator.id);
+            md.run(constants.rooms.dbMetadata.name, name);
+            md.run(constants.rooms.dbMetadata.presisted, isPersisted);
+            md.run(constants.rooms.dbMetadata.owner, moderator.id);
             if (taskRegex)
-                md.run(ls.rooms.dbMetadata.taskRegex, taskRegex);
+                md.run(constants.rooms.dbMetadata.taskRegex, taskRegex);
             const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 1);")
             mod.run(moderator.id, moderator.name);
             const card = db.prepare("insert into cards (id, val, label) values (?, ?, ?);")
