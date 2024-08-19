@@ -9,7 +9,8 @@
 		<style>
 			* {
 				background-color: #171717;
-				margin: 0 0 10px 0;
+				margin: 0 0 0 0;
+				padding: 0 0 0 0;
 				color: #f0f0f0;
 			}
 
@@ -54,6 +55,8 @@
 
 			.bdel {
 				border: solid 1px #990000;
+				padding-right: 5px;
+				padding-left: 5px;
 			}
 
 			.bdel:hover {
@@ -106,6 +109,9 @@
 			/* Tables */
 			table {
 				border: solid 1px #555555;
+				border-radius: 5px;
+				margin-bottom: 1rem;
+				margin-top: 1rem;
 			}
 
 			th {
@@ -122,8 +128,12 @@
 				vertical-align: center;
 			}
 
-			tr:nth-child(even) {
-				background-color: #222222;
+			tr > th {
+				border-bottom: solid 1px #555555;
+			}
+
+			tr:nth-child(even) > td {
+				background: #222222;
 			}
 
 			tr:hover {

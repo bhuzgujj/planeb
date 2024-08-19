@@ -23,7 +23,9 @@
      * @param {string} id
      */
     function deleteSet(id) {
-
+        fetch("/cards/" + id, {
+            method: "DELETE"
+        })
     }
 
     /**
@@ -43,7 +45,7 @@
 
     onMount(() => {
         userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        socket.listenToUpdate(onServerUpdate, {type: "sets", data: true, userId})
+        socket.listen(onServerUpdate, {type: "sets", data: true, userId})
     })
 
     onDestroy(() => {
@@ -70,8 +72,8 @@
     {#each sets.keys() as id}
         <tr id={id}>
             <td>
-                <button on:click={() => deleteSet(id)} class="bdel" style="margin-bottom: 0px">
-                    Delete
+                <button on:click={() => deleteSet(id)} class="bdel">
+                    🗑️
                 </button>
             </td>
             <td style="width: 100%; padding-left: 10px" on:click={() => goto(`/cards/${id}`)}>

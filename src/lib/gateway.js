@@ -2,6 +2,7 @@ import * as db from './db/database.js';
 import * as ws from './net/websocket.js';
 import logger from "$lib/logger.js";
 import {putUserInRoom} from "./db/database.js";
+import {createId} from "../idGenerator.js";
 
 /**
  * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
@@ -120,18 +121,18 @@ export function getCardSets() {
  * @returns {Promise<void>}
  */
 export async function createCardSet(name) {
-    const id= crypto.randomUUID()
+    const id= createId()
     /** @type {CardSet} */
     let set = {
         name,
         cards: [
             {
-                id: crypto.randomUUID(),
+                id: createId(),
                 value: 1,
                 label: "1"
             },
             {
-                id: crypto.randomUUID(),
+                id: createId(),
                 value: 2,
                 label: "2"
             },
@@ -152,12 +153,20 @@ export async function createCardSet(name) {
  * @returns {Promise<void>}
  */
 export async function modifySet(id, cardSet) {
-    logger.debug(cardSet)
     await db.modifyCardSet(id, cardSet)
     await ws.notify({
         action: "update",
         id,
         evt: cardSet
+    }, "sets", [])
+}
+
+export async function deleteSet(id) {
+    await db.deleteSet(id)
+    await ws.notify({
+        action: "remove",
+        id,
+        evt: {}
     }, "sets", [])
 }
 
@@ -224,5 +233,24 @@ export async function acceptVote(vote) {
             },
         }
     }, "room", [vote.roomId])
+    await Promise.all([dbExec])
+}
+
+/**
+ * Delete task
+ * @param {string} taskId
+ * @param {string} roomId
+ * @return {Promise<void>}
+ */
+export async function deleteTask(taskId, roomId) {
+    const dbExec = db.deleteTask(taskId, roomId)
+    ws.notify({
+        evt: {
+            task: {
+                action: "remove",
+                id: taskId
+            },
+        }
+    }, "room", [roomId])
     await Promise.all([dbExec])
 }

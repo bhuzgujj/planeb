@@ -36,7 +36,7 @@
 
     onMount(() => {
         userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        socket.listenToUpdate(onServerUpdate, {type: "list", data: true, userId})
+        socket.listen(onServerUpdate, {type: "list", data: true, userId})
     })
 
     onDestroy(() => {
@@ -53,9 +53,8 @@
     }
 </script>
 
-<a href="/rooms/create" style="padding: 2px; width: 100%;">Create a new room</a>
+<button on:click={() => goto("/rooms/create")}>Create a new room</button>
 <br>
-<p>Current rooms</p>
 <table style="width: 100%">
     <tr>
         <th>Control</th>
@@ -64,8 +63,8 @@
     {#each rooms.keys() as id}
         <tr id={id}>
             <td>
-                <button on:click={() => deleteRoom(id)} class="bdel" style="margin-bottom: 0px" disabled={!isOwner(id, userId)}>
-                    Delete
+                <button on:click={() => deleteRoom(id)} class="bdel"  disabled={!isOwner(id, userId)}>
+                    🗑️
                 </button>
             </td>
             <td style="width: 100%; padding-left: 10px" on:click={() => goto(`/rooms/${id}`)}>

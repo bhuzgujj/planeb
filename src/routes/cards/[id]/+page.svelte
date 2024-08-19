@@ -1,5 +1,6 @@
 <script>
     import {goto} from "$app/navigation";
+    import { createId } from '../../../idGenerator.js';
 
     /** @type {import('./$types').PageData} */
     export let data;
@@ -43,12 +44,25 @@
             .filter(c => isNaN(parseFloat(c.value)))
             .length === 0
 
+    function createNewEntry() {
+        /** @type {any} */
+        cards[createId()] = {label:"0", value: "0", sync: true}
+    }
+
+    /**
+     *
+     * @param {string} id
+     */
+    function deleteCard(id) {
+        delete cards[id]
+        cards = cards
+    }
 </script>
 <label>
     Set Name: <input type="text" bind:value={name}/>
 </label>
 <p>Cards:</p>
-<button on:click={() => {cards[crypto.randomUUID()] = {label:"", value: "0", sync: true}}}>Add</button>
+<button on:click={() => createNewEntry()}>Add</button>
 <table style="width: 100%">
     <tr>
         <th>Control</th>
@@ -58,10 +72,11 @@
     {#if Object.keys(cards).length>0}
         {#each Object.keys(cards) as card}
             <tr>
-                <td><button class="bdel" on:click={() => {
-                        delete cards[card]
-                        cards = cards
-                    }} disabled={Object.keys(cards).length <= 2}>Remove</button></td>
+                <td>
+                    <button class="bdel" on:click={() => deleteCard(card)} disabled={Object.keys(cards).length <= 2}>
+                        🗑️
+                    </button>
+                </td>
                 <td><input bind:value={cards[card].value} on:input={(e) => {
                     if (cards[card].sync){
                         cards[card].label = cards[card].value

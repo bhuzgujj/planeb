@@ -12,7 +12,8 @@
     /** @type {string | null} */
     let selectedSet = null
 </script>
-<p>Create a room</p>
+<h1>Create a room</h1>
+<br>
 <form
         method="post"
         use:enhance={(res) => {
@@ -64,10 +65,12 @@
     </label>
     <br>
     <table style="width: 100%">
-        <tr>
-            <th>Label</th>
-            <th style="padding-left: 10px">Value</th>
-        </tr>
+        <thead>
+            <tr>
+                <th>Label</th>
+                <th style="padding-left: 10px">Value</th>
+            </tr>
+        </thead>
         {#if selectedSet !== null}
             {#each sets.get(selectedSet)?.cards ?? [] as card}
                 <tr id={card.id}>
@@ -87,3 +90,17 @@
     </table>
     <button type="submit">Create</button>
 </form>
+
+<style>
+    label {
+        width: 300px;
+    }
+
+    tr > td {
+        text-align: center;
+    }
+
+    tr > th {
+        text-align: center;
+    }
+</style>

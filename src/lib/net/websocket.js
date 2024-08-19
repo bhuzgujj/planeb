@@ -3,6 +3,7 @@ import logger from "$lib/logger.js";
 import {addUserToRoom} from "$lib/gateway.js";
 import Database from "better-sqlite3";
 import {queries} from "$lib/db/queries.js";
+import {createId} from "../../idGenerator.js";
 
 /**
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
@@ -15,12 +16,15 @@ import {queries} from "$lib/db/queries.js";
  * @typedef {import('$lib/network.d.ts').MessageType} MessageType
  */
 
-const cache = new Database(":memory:", { verbose: logger.debug })
-
 /** @type {WebSocketServer | null} */
 let socket = null;
+
+const updateUserQuery = "update users set vote = ? where id = ?;";
+
 /** @type {Map<string, {socket: any, ip: string}>} */
 const connectionPool = new Map();
+
+const cache = new Database(":memory:", { verbose: logger.debug })
 
 function init() {
     if (socket) {
@@ -37,7 +41,7 @@ function init() {
             throw new Error("WebSocket not initialized");
         try {
             socket.on("connection", (ws, req) => {
-                const id = crypto.randomUUID();
+                const id = createId();
                 cache.prepare("insert into connections (id) values (?)").run(id)
                 connectionPool.set(id, {socket: ws, ip: req.socket.remoteAddress})
                 ws.on("message", onMessage(id))
@@ -124,6 +128,16 @@ function onMessage(id) {
                         }
                     }, "room", [data.roomId])
                 }
+                break;
+            case "result":
+                notify({
+                    evt: {
+                        voting: {
+                            taskId: data.taskId,
+                            show: true
+                        }
+                    }
+                }, "room", [data.roomId])
                 break;
             case "sets":
                 cache.prepare("update connections set setted = ? where id = ?;").run(+data, id)
@@ -223,10 +237,10 @@ export function notify(evt, type, roomIds) {
  * @return {Promise<void>}
  */
 export async function vote(vote) {
-    cache.prepare("update users set vote = ? where id = ?;").run(vote.card, vote.userId)
+    cache.prepare(updateUserQuery).run(vote.card, vote.userId)
 }
 
-function close() {
+async function close() {
     for (const connection of connectionPool.values())
         connection.socket.close()
     socket?.close(() => {

@@ -3,11 +3,17 @@
     export let show;
     /** @type {() => void} */
     export let onClose;
+    /** @type {() => void} */
+    export let onSave;
     /** @type HTMLDialogElement */
     let dialog
     $: if (dialog && show) dialog.showModal();
     function close() {
         onClose()
+        dialog.close()
+    }
+    function save() {
+        onSave()
         dialog.close()
     }
 </script>
@@ -23,7 +29,7 @@
         <slot />
         <hr />
         <button on:click={() => close()}>Cancel</button>
-        <button on:click={() => close()}>Save</button>
+        <button on:click={() => save()}>Save</button>
     </div>
 </dialog>
 

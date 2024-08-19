@@ -4,6 +4,7 @@ import logger from "$lib/logger.js";
 import {DATABASE, DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
 import ls from "../../constant.js";
+import {createId} from "../../idGenerator.js";
 
 /**
  * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
@@ -182,6 +183,23 @@ export async function modifyCardSet(id, cardSet) {
     }
 }
 
+export async function deleteSet(id) {
+    let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
+    let db;
+    try {
+        db = new Database(dbPath, { verbose: logger.debug });
+        db.prepare("delete from cards_set where id = ?;").run(id);
+        cardsSet.delete(id);
+    } catch (e) {
+        logger.error(`card set failed modification: ${e}`)
+    } finally {
+        if (db) {
+            db.close()
+        }
+    }
+
+}
+
 /**
  * Vote in a room
  * @param {import("$lib/network.js").Vote} vote
@@ -217,6 +235,17 @@ export async function acceptVote(vote) {
     }
 }
 
+export async function deleteTask(taskId, roomId) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("delete from tasks where id = ?;")
+            .run(taskId)
+    } catch (e) {
+        logger.error(`"${roomId}:${taskId}" database failed to remove task: ${e}`)
+    }
+}
+
 /**
  * Create a room
  * @param {string} name
@@ -227,7 +256,7 @@ export async function acceptVote(vote) {
  * @return {Promise<string>}
  */
 export async function createRoom(name, isPersisted, moderator, cards, taskRegex) {
-    const roomId = crypto.randomUUID();
+    const roomId = createId();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
         logger.debug(`Initializing database "${roomId}:${name}"...`);
@@ -266,7 +295,7 @@ export async function createRoom(name, isPersisted, moderator, cards, taskRegex)
  * @returns {Promise<string>}
  */
 export async function addTaskToRoom(task, roomId) {
-    const taskId = crypto.randomUUID();
+    const taskId = createId();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     let db;
     try {
@@ -429,7 +458,7 @@ function deleteRoom(id) {
 /**
  * Delete database not persisted
  */
-export function cleanup() {
+export async function cleanup() {
     for (const [id, room] of rooms.entries()) {
         if (!room.isPersisted)
             deleteRoom(id)

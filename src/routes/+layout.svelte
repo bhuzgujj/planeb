@@ -26,7 +26,7 @@
         }
     }
 
-    onMount(()=>{
+    onMount(() => {
         name = localStorage.getItem(ls.itemKeys.name) ?? ""
     })
 </script>
@@ -39,11 +39,11 @@
         <a href="/cards">Card sets</a>
     </div>
     <label>
-        Name: <input type="text" style="padding: 0; margin: 0;" on:keypress={(e) => nameChange(e)} bind:value={name}/>
+        Name: <input type="text" on:keypress={(e) => nameChange(e)} bind:value={name}/>
     </label>
 </nav>
 
-<div class="fcenter">
+<div class="fcenter" style="margin-bottom: 1rem; margin-top: 1rem;">
     <div class="fcol">
         <slot/>
     </div>

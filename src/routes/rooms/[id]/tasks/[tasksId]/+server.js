@@ -1,4 +1,4 @@
-import {acceptVote} from "$lib/gateway.js";
+import {acceptVote, deleteTask} from "$lib/gateway.js";
 import {json} from "@sveltejs/kit";
 
 export async function PATCH({params, request}) {
@@ -10,4 +10,12 @@ export async function PATCH({params, request}) {
         tasksId: params.tasksId
     })
     return json(body)
+}
+
+export async function DELETE({params}) {
+    await deleteTask(params.tasksId, params.id)
+    return json({
+        roomId: params.id,
+        tasksId: params.tasksId
+    })
 }

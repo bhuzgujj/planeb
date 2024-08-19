@@ -25,7 +25,7 @@ function init(shouldLog) {
         return
     }
     retries++
-    socket = new WebSocket("ws://localhost:43594/");
+    socket = new WebSocket(`ws://${import.meta.env.VITE_WS_IP}:${import.meta.env.VITE_WS_PORT}/`);
     socket.onopen = () => {
         if (!socket)
             throw new Error("WebSocket not initialized");
@@ -54,7 +54,7 @@ function init(shouldLog) {
  * @param {NetCallback} listener
  * @param {import('$lib/network.d.ts').WebSocketRegisteringEvent<T>} subMsg
  */
-function listenToUpdate(listener, subMsg) {
+function listen(listener, subMsg) {
     listeners.push({listener, type: subMsg.type})
 
     if (socket) {
@@ -90,7 +90,7 @@ function send(data, type) {
 
 export default {
     init,
-    listenToUpdate,
+    listen,
     stopListening,
     send
 }
