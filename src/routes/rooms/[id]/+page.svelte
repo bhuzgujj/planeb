@@ -112,7 +112,7 @@
      */
     function putVoting(voting) {
         selectTaskToVoteFor(voting.taskId)
-        if (voting.taskId) {
+        if (voting.taskId && voting.show === undefined) {
             for (let i = 0; i < users.length; i++) {
                 users[i].vote = undefined
             }
@@ -128,7 +128,7 @@
                 }
             }
         }
-        if (voting.show && taskIdSelected && voting.taskId === tasks[taskIdSelected].id) {
+        if (voting.show && taskIdSelected !== null && voting.taskId === tasks[taskIdSelected].id) {
             overrideVotes = true
         }
         users = users
@@ -281,7 +281,7 @@
     }
 
     function showResult() {
-        if (taskIdSelected) {
+        if (taskIdSelected !== null) {
             socket.send({
                 taskId: tasks[taskIdSelected].id,
                 roomId: data.id
@@ -433,7 +433,7 @@
     </div>
 </div>
 
-<div style="display: flex; justify-content: space-between">
+<div style="display: flex; justify-content: space-between; margin-top: 10px">
     <label>Tasks: <input type="text" bind:value={newTask}>
         <button disabled={!isMod} on:click={() => addTask()}>Add</button>
     </label>
