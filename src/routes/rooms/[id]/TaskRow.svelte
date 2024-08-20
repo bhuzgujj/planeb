@@ -16,7 +16,7 @@
 </script>
 
 <tr class={rowClass}>
-    <td>
+    <td style="text-align: center">
         <button class="bdel" disabled={!isMod} on:click={() => deleteTask()}>
             🗑️
         </button>
@@ -24,7 +24,7 @@
             🗨️
         </button>
         <button disabled={!isMod} on:click={() => {selectTask()}}>
-            ✅
+            🎯
         </button>
     </td>
     <td>{task.no ?? ""}</td>

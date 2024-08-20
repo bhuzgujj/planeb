@@ -62,7 +62,7 @@
     </tr>
     {#each rooms.keys() as id}
         <tr id={id}>
-            <td>
+            <td style="text-align: center">
                 <button on:click={() => deleteRoom(id)} class="bdel"  disabled={!isOwner(id, userId)}>
                     🗑️
                 </button>

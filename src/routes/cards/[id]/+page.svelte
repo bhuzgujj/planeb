@@ -61,18 +61,18 @@
 <label>
     Set Name: <input type="text" bind:value={name}/>
 </label>
-<p>Cards:</p>
-<button on:click={() => createNewEntry()}>Add</button>
+<br style="margin-bottom: 15px">
+<button on:click={() => createNewEntry()}>Add Card</button>
 <table style="width: 100%">
     <tr>
-        <th>Control</th>
+        <th style="width: 5%"></th>
         <th>Points value</th>
         <th>Card label text</th>
     </tr>
     {#if Object.keys(cards).length>0}
         {#each Object.keys(cards) as card}
             <tr>
-                <td>
+                <td style="text-align: center">
                     <button class="bdel" on:click={() => deleteCard(card)} disabled={Object.keys(cards).length <= 2}>
                         🗑️
                     </button>

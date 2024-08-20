@@ -447,7 +447,7 @@
 </div>
 <table style="width: 100%;">
     <tr>
-        <th style="width: 10%">Control</th>
+        <th style="width: 10%"></th>
         <th style="width: 10%">Task no</th>
         <th style="width: 70%">Name</th>
         <th style="width: 10%; text-align: center">Voted</th>

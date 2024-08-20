@@ -71,7 +71,7 @@
     </tr>
     {#each sets.keys() as id}
         <tr id={id}>
-            <td>
+            <td style="text-align: center">
                 <button on:click={() => deleteSet(id)} class="bdel">
                     🗑️
                 </button>
