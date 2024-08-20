@@ -45,18 +45,18 @@
             {form?.nameError}
         </p>
     {/if}
-    <label>Room name:<br><input name="name" type="text" value={form?.name ?? ""}></label>
+    <label>Room name<br><input name="name" type="text" value={form?.name ?? ""}></label>
     <br style="margin-bottom: 15px">
     <label>Persist room: <input name="persisted" type="checkbox"></label>
     <br style="margin-bottom: 15px">
-    <label>Task number prefix:<br><input name="task_prefix" type="text"></label>
+    <label>Task number prefix<br><input name="task_prefix" type="text"></label>
     <br style="margin-bottom: 15px">
     {#if form?.setError}
         <p class="terror">
             {form?.setError}
         </p>
     {/if}
-    <label>Selected Cards:<br>
+    <label>Selected Cards<br>
         <select name="sets" bind:value={selectedSet}>
             {#each sets.keys() as id}
                 <option value={id}>{sets.get(id)?.name}</option>
