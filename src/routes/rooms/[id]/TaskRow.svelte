@@ -27,7 +27,11 @@
             🎯
         </button>
     </td>
-    <td>{task.no ?? ""}</td>
+    <td>
+        {#if task.no !== undefined && task.no !== null}
+            <a href={`${import.meta.env.VITE_TASK_LINK}${task.no}`}>{task.no}</a>
+        {/if}
+    </td>
     <td>{task.name}</td>
     <td style="text-align: center">{cards.find(card => card.id === task.vote)?.label ?? "?"}</td>
 </tr>
@@ -43,5 +47,9 @@
     button {
         padding-right: 5px;
         padding-left: 5px;
+    }
+
+    a {
+        background: #00000000;
     }
 </style>
