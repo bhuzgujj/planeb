@@ -1,4 +1,4 @@
-export type LoggingLevel = "error" | "info" | "warn" | "debug" | "none"
+export type LoggingLevel = "error" | "info" | "warn" | "debug" | "none" | "db"
 export type LoggerConfig = {
     level?: LoggingLevel,
     showOrigin?: boolean

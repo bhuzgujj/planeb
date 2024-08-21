@@ -24,6 +24,7 @@ levels.set("error", 1);
 levels.set("warn", 2);
 levels.set("info", 3);
 levels.set("debug", 4);
+levels.set("db", 5);
 
 /**
  * Initialize the logger
@@ -88,4 +89,5 @@ export default {
     warn: (msg) => log(msg, "warn"),
     info: (msg) => log(msg, "info"),
     debug: (msg) => log(msg, "debug"),
+    db: (msg) => log(msg, "db"),
 }

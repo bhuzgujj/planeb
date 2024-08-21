@@ -65,6 +65,15 @@ export function init(config) {
 }
 
 /**
+ * Create a db connection
+ * @param {string} dbPath
+ * @return {Database}
+ */
+export function createDb(dbPath) {
+    return new Database(dbPath, { verbose: logger.db });
+}
+
+/**
  * Execute a query on a database
  * @param {string} path
  * @param {Query} query
@@ -78,7 +87,7 @@ async function executeQuery(path, query, dataFiller) {
      */
     let db
     try {
-        db = new Database(path, { verbose: logger.debug });
+        db = createDb(path);
         db.exec(sql)
         if (dataFiller) {
             dataFiller(db)
@@ -99,7 +108,7 @@ async function executeQuery(path, query, dataFiller) {
 function fillState(dir, fileName) {
     if (!fileName.endsWith(".db"))
         return
-    let db = new Database(`${dir}/${fileName}`, { verbose: logger.debug })
+    let db = createDb(`${dir}/${fileName}`)
     try {
         let prep = db.prepare("select * from metadatas where keys = ?")
         let name = prep.get(constants.rooms.dbMetadata.name)
@@ -136,7 +145,7 @@ export async function createCardSet(id, cardSet) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
     try {
-        db = new Database(dbPath, { verbose: logger.debug });
+        db = createDb(dbPath)
         const set = db.prepare("insert into cards_set (id, names) values (?, ?);")
         set.run(id, cardSet.name);
         for (const card of cardSet.cards) {
@@ -162,7 +171,7 @@ export async function modifyCardSet(id, cardSet) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
     try {
-        db = new Database(dbPath, { verbose: logger.debug });
+        db = createDb(dbPath, { verbose: logger.debug });
         db.prepare("update cards_set set names = ? where id = ?;")
             .run(cardSet.name, id);
         for (const card of cardSet.cards) {
@@ -192,7 +201,7 @@ export async function deleteSet(id) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
     try {
-        db = new Database(dbPath, { verbose: logger.debug });
+        db = createDb(dbPath, { verbose: logger.debug });
         db.prepare("delete from cards_set where id = ?;").run(id);
         cardsSet.delete(id);
     } catch (e) {
@@ -213,7 +222,7 @@ export async function deleteSet(id) {
 export async function vote(vote) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
     try {
-        const db = new Database(dbPath, { verbose: logger.debug })
+        const db = createDb(dbPath, { verbose: logger.debug })
         const exist = db.prepare("update votes set card_id = ? where user_id = ? and task_id = ?;")
             .run(vote.card, vote.userId, vote.tasksId)
         if (exist.changes === 0) {
@@ -232,7 +241,7 @@ export async function vote(vote) {
 export async function acceptVote(vote) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
     try {
-        const db = new Database(dbPath, { verbose: logger.debug })
+        const db = createDb(dbPath, { verbose: logger.debug })
         db.prepare("update tasks set card_id = ? where id = ?;")
             .run(vote.card, vote.tasksId)
     } catch (e) {
@@ -247,7 +256,7 @@ export async function acceptVote(vote) {
 export async function moderation(mod) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${mod.roomId}.db`;
     try {
-        const db = new Database(dbPath, { verbose: logger.debug })
+        const db = createDb(dbPath, { verbose: logger.debug })
         db.prepare("update users set moderator = ? where id = ?;")
             .run(+mod.moderator, mod.userId)
     } catch (e) {
@@ -264,7 +273,7 @@ export async function moderation(mod) {
 export async function isModerator(roomId, userId) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
-        const db = new Database(dbPath, { verbose: logger.debug })
+        const db = createDb(dbPath, { verbose: logger.debug })
         const mod = db.prepare("select * from users where moderator = 1 and id = ?;").all(userId)
         return mod.length > 0
     } catch (e) {
@@ -296,7 +305,7 @@ export function isOwner(roomId, userId) {
 export async function saveComment(comment) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${comment.roomId}.db`;
     try {
-        const db = new Database(dbPath, { verbose: logger.debug })
+        const db = createDb(dbPath, { verbose: logger.debug })
         db.prepare("update tasks set comments = ? where id = ?;")
             .run(comment.comment, comment.tasksId)
     } catch (e) {
@@ -313,7 +322,7 @@ export async function saveComment(comment) {
 export async function deleteTask(taskId, roomId) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
-        const db = new Database(dbPath, { verbose: logger.debug })
+        const db = createDb(dbPath, { verbose: logger.debug })
         db.prepare("delete from tasks where id = ?;")
             .run(taskId)
     } catch (e) {
@@ -380,7 +389,7 @@ export async function addTaskToRoom(task, roomId) {
     let db;
     try {
         logger.debug(`"${roomId}:${task.name}" add a task: ${task}`)
-        db = new Database(dbPath)
+        db = createDb(dbPath)
         if (task.no) {
             db.prepare("insert into tasks (id, names) values (?, ?);")
                 .run(taskId, task.name)
@@ -410,7 +419,7 @@ export async function putUserInRoom(user, roomId) {
     let db;
     try {
         logger.debug(`Adding user into database "${roomId}:${user.names}"...`);
-        db = new Database(dbPath);
+        db = createDb(dbPath);
         let users = db.prepare("select count(*) from users where id = ?;").get(user.id);
         if (users['count(*)'] > 0) {
             if (user.moderator) {
@@ -460,7 +469,7 @@ export function getRoomsById(id) {
     if (!roomInfo)
         return null
     let dbPath = `${DATABASE_FOLDER}/rooms/${id}.db`;
-    const db = new Database(dbPath)
+    const db = createDb(dbPath)
     try {
         /** @type {Array<UserInfo>} */
         let users = [];

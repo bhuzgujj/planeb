@@ -58,7 +58,7 @@ export function createRoom(name, isPersisted, moderator, cards, taskPrefix, task
 export function changeName(id, name) {
     let roomSubscribed = ws.getSubscribedRoom(id)
     if (!roomSubscribed || roomSubscribed.length === 0) {
-        logger.warn("No room subed for userid: " + id)
+        logger.debug("No room subed for userid: " + id)
         return;
     }
     return addUserToRoom(roomSubscribed, id, name);

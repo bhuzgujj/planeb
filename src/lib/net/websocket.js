@@ -1,9 +1,9 @@
 import {WebSocketServer} from "ws";
 import logger from "$lib/logger.js";
 import {addUserToRoom} from "$lib/gateway.js";
-import Database from "better-sqlite3";
 import {queries} from "$lib/db/queries.js";
 import {createId} from "../../idGenerator.js";
+import {createDb} from "$lib/db/database.js";
 
 /**
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
@@ -22,7 +22,7 @@ let socket = null;
 /** @type {Map<string, {socket: any, ip: string}>} */
 const connectionPool = new Map();
 
-const cache = new Database(":memory:", { verbose: logger.debug })
+const cache = createDb(":memory:")
 
 function init() {
     if (socket) {
@@ -45,7 +45,6 @@ function init() {
                 ws.on("message", onMessage(id))
                 ws.on("close", onClose(id))
                 ws.on("error", onError(id))
-                ws.send(JSON.stringify({ connectionId: id }))
             })
             logger.debug("Websocket initialized")
             resolve()
@@ -55,6 +54,19 @@ function init() {
         }
     })
     creation.catch(logger.error)
+}
+
+/**
+ * Verify if the connection id is attributed to the userId
+ * @param connectionId
+ * @param userId
+ * @return {boolean}
+ */
+function userIsValid(connectionId, userId) {
+    const conn = cache.prepare("select * from connections where users_id = ?").all(userId);
+    if (conn.length !== 1)
+        return true;
+    return conn[0].id === connectionId
 }
 
 /**
@@ -70,6 +82,10 @@ function onMessage(id) {
          * @type {import("$lib/network.js").WebSocketMessageEvent<T>}
          */
         const item = JSON.parse(msg)
+        if (!userIsValid(id, item.userId)) {
+            logger.warn(`Connection id "${id}:${connectionPool.get(id)?.ip}" try to impersonate user "${item.userId}"`)
+            return;
+        }
         /** @type {any} */
         const data = item.data
         switch (item.type) {
@@ -185,7 +201,8 @@ export function getSubscribedRoom(userId) {
  * @param {string[]} roomIds
  */
 export function notify(evt, type, roomIds) {
-    logger.info(`Broadcasting: ${JSON.stringify(evt)}`)
+    const to = roomIds.length > 0 ? JSON.stringify(roomIds) : "ALL"
+    logger.info(`Broadcasting to ${to}: ${JSON.stringify(evt)}`)
     let connectionIds;
     switch (type) {
         case "list":
