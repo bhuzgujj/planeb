@@ -1,7 +1,7 @@
 <script>
     import {goto} from "$app/navigation";
     import {onDestroy, onMount} from "svelte";
-    import ls from "../../constant.js";
+    import constants from "../../constant.js";
     import socket from "$lib/net/socket.js";
 
     /**
@@ -23,7 +23,9 @@
      * @param {string} id
      */
     function deleteSet(id) {
-
+        fetch("/cards/" + id, {
+            method: "DELETE"
+        })
     }
 
     /**
@@ -42,8 +44,8 @@
     }
 
     onMount(() => {
-        userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        socket.listenToUpdate(onServerUpdate, {type: "sets", data: true, userId})
+        userId = localStorage.getItem(constants.localStorageKeys.id) ?? ""
+        socket.listen(onServerUpdate, {type: "sets", data: true, userId})
     })
 
     onDestroy(() => {
@@ -69,9 +71,9 @@
     </tr>
     {#each sets.keys() as id}
         <tr id={id}>
-            <td>
-                <button on:click={() => deleteSet(id)} class="bdel" style="margin-bottom: 0px">
-                    Delete
+            <td style="text-align: center">
+                <button on:click={() => deleteSet(id)} class="bdel">
+                    🗑️
                 </button>
             </td>
             <td style="width: 100%; padding-left: 10px" on:click={() => goto(`/cards/${id}`)}>

@@ -2,7 +2,7 @@
     import {onDestroy, onMount} from "svelte";
     import socket from "$lib/net/socket.js";
     import {goto} from "$app/navigation";
-    import ls from "../../constant.js";
+    import constants from "../../constant.js";
 
     /** @type {import('./$types').PageData} */
     export let data;
@@ -14,7 +14,12 @@
      * @param {string} id
      */
     function deleteRoom(id) {
-        fetch(`/rooms/${id}`, { method: 'DELETE' })
+        fetch(`/rooms/${id}`, {
+            method: 'DELETE' ,
+            body: JSON.stringify({
+                userId: userId,
+            })
+        })
             .finally(() => {
                 rooms.delete(id)
                 rooms = rooms
@@ -35,8 +40,8 @@
     }
 
     onMount(() => {
-        userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        socket.listenToUpdate(onServerUpdate, {type: "list", data: true, userId})
+        userId = localStorage.getItem(constants.localStorageKeys.id) ?? ""
+        socket.listen(onServerUpdate, {type: "list", data: true, userId})
     })
 
     onDestroy(() => {
@@ -53,9 +58,8 @@
     }
 </script>
 
-<a href="/rooms/create" style="padding: 2px; width: 100%;">Create a new room</a>
+<button on:click={() => goto("/rooms/create")}>Create a new room</button>
 <br>
-<p>Current rooms</p>
 <table style="width: 100%">
     <tr>
         <th>Control</th>
@@ -63,9 +67,9 @@
     </tr>
     {#each rooms.keys() as id}
         <tr id={id}>
-            <td>
-                <button on:click={() => deleteRoom(id)} class="bdel" style="margin-bottom: 0px" disabled={!isOwner(id, userId)}>
-                    Delete
+            <td style="text-align: center">
+                <button on:click={() => deleteRoom(id)} class="bdel"  disabled={!isOwner(id, userId)}>
+                    🗑️
                 </button>
             </td>
             <td style="width: 100%; padding-left: 10px" on:click={() => goto(`/rooms/${id}`)}>

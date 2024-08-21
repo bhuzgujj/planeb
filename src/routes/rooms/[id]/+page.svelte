@@ -1,9 +1,11 @@
 <script>
-    import ls from "../../../constant.js";
+    import constants from "../../../constant.js";
     import {onDestroy, onMount} from "svelte";
     import socket from "$lib/net/socket.js";
-    import CommentModal from "../../../components/CommentModal.svelte";
+    import MainModal from "../../../components/CommentModal.svelte";
     import Graph from "../../../components/Graph.svelte";
+    import TaskRow from "./TaskRow.svelte";
+    import BatchTaskCreationForm from "../../../components/BatchTaskCreationForm.svelte";
 
     /** @type {import('./$types').PageData} */
     export let data;
@@ -14,8 +16,18 @@
     let userName = ""
     /** @type {Array<import('$lib/data.d.ts').UserInfo>} */
     let users = data.users
+    /** @type {import("$lib/data.js").Task[]} */
+    let tasksPreviews = []
+    /** @type boolean */
+    let creatingTasks = false
     /** @type {boolean} */
     $: voted = users.filter(u => u.vote === undefined || u.vote === null).length < 1
+    /** @type {boolean} */
+    let overrideVotes = false
+    $: {
+        overrideVotes = false
+        taskIdSelected
+    }
     /** @type {Array<import('$lib/data.d.ts').TaskInfo>} */
     let tasks = data.tasks
     /** @type {Array<import('$lib/data.d.ts').Card>} */
@@ -38,6 +50,7 @@
     let cardSelected = null
     $: showCommentModal = taskCommenting != null
     let comments = ""
+    $: showResultEnable = isMod && taskIdSelected !== null;
     $: {
         if (taskCommenting !== null && prevCommentTask !== taskCommenting) {
             comments = tasks.find(task => task.id === taskCommenting)?.comments ?? ""
@@ -45,12 +58,12 @@
         }
     }
 
-    function closeDialog() {
+    function closeComment() {
         taskCommenting = null
     }
 
     /**
-     *
+     * Notification of a change on a user
      * @param {any} usr
      */
     function putUser(usr) {
@@ -69,35 +82,42 @@
     }
 
     /**
-     *
+     * Notification of a change on a task
      * @param {any} tsk
      */
     function putTask(tsk) {
         let found = false
-        tasks = tasks.map(task => {
-            if (task.id === tsk.id) {
-                task = {...task, ...tsk.evt}
-                found = true
-            }
-            return task
-        })
-        if (!found) {
-            tasks.push({
-                id: tsk.id,
-                name: tsk.evt.name,
-                no: tsk.evt.no
-            })
+        switch (tsk.action) {
+            case "remove":
+                tasks = tasks.filter(t => t.id !== tsk.id)
+                break;
+            default:
+                tasks = tasks.map(task => {
+                    if (task.id === tsk.id) {
+                        task = {...task, ...tsk.evt}
+                        found = true
+                    }
+                    return task
+                })
+                if (!found) {
+                    tasks.push({
+                        id: tsk.id,
+                        name: tsk.evt.name,
+                        no: tsk.evt.no
+                    })
+                }
+                tasks = tasks
+                break;
         }
-        tasks = tasks
     }
 
     /**
-     *
+     * Notification of a change on a vote
      * @param {any} voting
      */
     function putVoting(voting) {
         selectTaskToVoteFor(voting.taskId)
-        if (voting.taskId) {
+        if (voting.taskId && voting.show === undefined) {
             for (let i = 0; i < users.length; i++) {
                 users[i].vote = undefined
             }
@@ -112,6 +132,9 @@
                     }
                 }
             }
+        }
+        if (voting.show && taskIdSelected !== null && voting.taskId === tasks[taskIdSelected].id) {
+            overrideVotes = true
         }
         users = users
     }
@@ -138,32 +161,30 @@
         }
     }
 
+    /**
+     * Create a task in the current room
+     */
     function addTask() {
+        /** @type {string | undefined} */
         let no;
-        let name;
+        /** @type {string} */
+        let name = newTask.trim();
         if (data.roomInfo.taskRegex) {
-            const matchs = newTask.trim().match(data.roomInfo.taskRegex)
-            console.log(matchs)
+            const matchs = name.match(data.roomInfo.taskRegex)
             if (matchs) {
                 no = matchs[0]
-                name = newTask.trim()
-            } else {
-                name = newTask.trim()
             }
-        } else {
-            name = newTask.trim()
         }
-        fetch(`/rooms/${data.id}/tasks`, {
-            method: "POST",
-            body: JSON.stringify({
-                no,
-                name
-            })
-        })
+        /** @type {import("$lib/data.js").Task} */
+        const body = {
+            no,
+            name
+        }
+        saveTaskCreation([body])
     }
 
     /**
-     *
+     * Select task for voting
      * @param {string} id
      */
     function selectTaskToVoteFor(id) {
@@ -183,10 +204,31 @@
         }
     }
 
+    /**
+     * Delete task
+     * @param {string} id
+     */
+    function deleteTask(id) {
+        if (id === taskSelected?.id) {
+            return
+        }
+        fetch(`/rooms/${data.id}/tasks/${id}`, {
+            method: "DELETE",
+            body: JSON.stringify({
+                userId: userId,
+            })
+        })
+            .then(() => next())
+    }
+
     function next() {
-        if (taskIdSelected !== null && taskIdSelected + 1 < tasks.length) {
-            taskIdSelected += 1
-            taskIdSelected = taskIdSelected
+        if (taskIdSelected !== null) {
+            if (taskIdSelected + 1 < tasks.length) {
+                taskIdSelected += 1
+                taskIdSelected = taskIdSelected
+            } else {
+                taskIdSelected = null;
+            }
         }
         socket.send({
             taskId: taskIdSelected !== null ? tasks[taskIdSelected].id : null,
@@ -214,7 +256,9 @@
         if (card !== null && taskSelected !== null) {
             fetch(`/rooms/${data.id}/tasks/${taskSelected.id}/${userId}`, {
                 method: "PATCH",
-                body: JSON.stringify({cardId: card.id})
+                body: JSON.stringify({
+                    cardId: card.id
+                })
             })
         }
     }
@@ -236,6 +280,7 @@
             fetch(`/rooms/${data.id}/tasks/${taskSelected.id}`, {
                 method: "PATCH",
                 body: JSON.stringify({
+                    userId: userId,
                     cardId: acceptedCard
                 })
             })
@@ -246,9 +291,70 @@
         }
     }
 
+    function showResult() {
+        if (taskIdSelected !== null) {
+            socket.send({
+                taskId: tasks[taskIdSelected].id,
+                roomId: data.id
+            }, "result")
+        }
+    }
+
+    function saveComment() {
+        const task = tasks.find(task => task.id === taskCommenting)
+        if (task) {
+            fetch(`/rooms/${data.id}/tasks/${task.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    userId: userId,
+                    comment: comments
+                })
+            });
+            closeComment()
+        } else {
+            console.error("Cannot save comment to a non existing task")
+        }
+    }
+
+    /**
+     *
+     * @param {import("$lib/data.js").UserInfo} user
+     */
+    function toggleMod(user) {
+        fetch(`/rooms/${data.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                userId: userId,
+                targetId: user.id,
+                moderator: !user.moderator
+            })
+        })
+    }
+
+    /**
+     * @param {import("$lib/data.js").UserInfo} user
+     */
+    function canActOn(user) {
+        return isMod && data.roomInfo.owner !== user.id && user.id !== userId
+    }
+
+    /**
+     * @param {import("$lib/data.js").Task[]} tasks
+     */
+    function saveTaskCreation(tasks) {
+        fetch(`/rooms/${data.id}/tasks`, {
+            method: "POST",
+            body: JSON.stringify({
+                userId: userId,
+                tasks
+            })
+        })
+    }
+
     onMount(() => {
-        userId = localStorage.getItem(ls.itemKeys.id) ?? ""
-        userName = localStorage.getItem(ls.itemKeys.name) ?? ""
+        console.log(data)
+        userId = localStorage.getItem(constants.localStorageKeys.id) ?? ""
+        userName = localStorage.getItem(constants.localStorageKeys.name) ?? ""
         /** @type {import('$lib/network.d.ts').WebSocketRegisteringEvent<"room">} */
         let subMsg = {
             type: "room",
@@ -262,7 +368,7 @@
             }
         };
         putUser({id: userId, name: userName});
-        socket.listenToUpdate(onRoomUpdate, subMsg)
+        socket.listen(onRoomUpdate, subMsg)
     })
 
     onDestroy(() => {
@@ -285,7 +391,7 @@
 <h1>Welcome to room '{data.roomInfo.name}'</h1>
 <div style="display: flex">
     <div style="display: flex; flex-direction: column; width: 80%; margin-right: 1rem">
-        {#if voted && taskSelected !== null}
+        {#if (voted || overrideVotes) && taskSelected !== null}
             <h2>End of voting for {taskSelected.name}</h2>
             <Graph users={users} cards={cards} />
             <label>Selected points:
@@ -322,7 +428,7 @@
                             <td style="width: 80%">{user.name}</td>
                             <td style="text-align: center">?</td>
                             <td style="text-align: center; vertical-align: center">
-                                <input type="checkbox" disabled={!isMod}>
+                                <input type="checkbox" checked={user.moderator} disabled={!canActOn(user)} on:click={() => toggleMod(user)}>
                             </td>
                         </tr>
                     {:else if user.vote !== null && user.vote !== undefined}
@@ -330,7 +436,7 @@
                             <td style="width: 80%">{user.name}</td>
                             <td style="text-align: center">{showVote(user)}</td>
                             <td style="text-align: center; vertical-align: center">
-                                <input type="checkbox" disabled={!isMod}>
+                                <input type="checkbox" checked={user.moderator} disabled={!canActOn(user)} on:click={() => toggleMod(user)}>
                             </td>
                         </tr>
                     {:else }
@@ -338,7 +444,7 @@
                             <td style="width: 80%">{user.name}</td>
                             <td style="text-align: center">?</td>
                             <td style="text-align: center; vertical-align: center">
-                                <input type="checkbox" disabled={!isMod}>
+                                <input type="checkbox" checked={user.moderator} disabled={!canActOn(user)} on:click={() => toggleMod(user)}>
                             </td>
                         </tr>
                     {/if}
@@ -352,12 +458,13 @@
     </div>
 </div>
 
-<div style="display: flex; justify-content: space-between">
+<div style="display: flex; justify-content: space-between; margin-top: 10px">
     <label>Tasks: <input type="text" bind:value={newTask}>
         <button disabled={!isMod} on:click={() => addTask()}>Add</button>
     </label>
+    <button disabled={!isMod} on:click={() => creatingTasks = !creatingTasks}>Batch add task</button>
     <div style="height: 100%">
-        <button style="height: 100%" disabled={!isMod}>Show result</button>
+        <button style="height: 100%" disabled={!showResultEnable} on:click={() => showResult()}>Show result</button>
     </div>
     <div style="height: 100%">
         <button style="height: 100%" disabled={!isMod} on:click={() => previous()}>Previous</button>
@@ -366,58 +473,42 @@
 </div>
 <table style="width: 100%;">
     <tr>
-        <th style="width: 15%">Control</th>
+        <th style="width: 10%"></th>
         <th style="width: 10%">Task no</th>
-        <th style="width: 65%">Name</th>
+        <th style="width: 70%">Name</th>
         <th style="width: 10%; text-align: center">Voted</th>
     </tr>
     {#if tasks.length > 0}
         {#each tasks as task}
             {#if task.vote !== undefined && task.vote !== null}
-                <tr class="voteCompleted">
-                    <td>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod}>Delete</button>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod} on:click={() => {taskCommenting = task.id}}>
-                            Comment
-                        </button>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod}
-                                on:click={() => {selectTaskToVoteFor(task.id)}}>Select
-                        </button>
-                    </td>
-                    <td>{task.no ?? ""}</td>
-                    <td>{task.name}</td>
-                    <td style="text-align: center">{cards.find(card => card.id === task.vote)?.label ?? "?"}</td>
-                </tr>
+                <TaskRow
+                        bind:taskCommenting={taskCommenting}
+                        cards={cards}
+                        isMod={isMod}
+                        selectTask={() => selectTaskToVoteFor(task.id)}
+                        deleteTask={() => deleteTask(task.id)}
+                        task={task}
+                        rowClass="voteCompleted"
+                />
             {:else if task.id === taskSelected?.id}
-                <tr class="voting">
-                    <td>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod}>Delete</button>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod} on:click={() => {taskCommenting = task.id}}>
-                            Comment
-                        </button>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod}
-                                on:click={() => {selectTaskToVoteFor(task.id)}}>Select
-                        </button>
-                    </td>
-                    <td>{task.no ?? ""}</td>
-                    <td>{task.name}</td>
-                    <td style="text-align: center">{task.vote ?? '?'}</td>
-                </tr>
+                <TaskRow
+                        bind:taskCommenting={taskCommenting}
+                        cards={cards}
+                        isMod={isMod}
+                        selectTask={() => selectTaskToVoteFor(task.id)}
+                        deleteTask={() => deleteTask(task.id)}
+                        task={task}
+                        rowClass="voting"
+                />
             {:else}
-                <tr>
-                    <td>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod}>Delete</button>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod} on:click={() => {taskCommenting = task.id}}>
-                            Comment
-                        </button>
-                        <button style="padding-right: 5px; padding-left: 5px" disabled={!isMod}
-                                on:click={() => {selectTaskToVoteFor(task.id)}}>Select
-                        </button>
-                    </td>
-                    <td>{task.no ?? ""}</td>
-                    <td>{task.name}</td>
-                    <td style="text-align: center">{task.vote ?? '?'}</td>
-                </tr>
+                <TaskRow
+                        bind:taskCommenting={taskCommenting}
+                        cards={cards}
+                        isMod={isMod}
+                        selectTask={() => selectTaskToVoteFor(task.id)}
+                        deleteTask={() => deleteTask(task.id)}
+                        task={task}
+                />
             {/if}
         {/each}
     {:else}
@@ -426,14 +517,32 @@
         </tr>
     {/if}
 </table>
-<CommentModal bind:show={showCommentModal} onClose={closeDialog}>
+<MainModal
+        bind:show={showCommentModal}
+        onClose={closeComment}
+        onSave={saveComment}
+>
     <h2 slot="header">
         Comments for {tasks.find(task => task.id === taskCommenting)?.name ?? "UNKNOWN"}
     </h2>
     <div style="width: 100%">
         <textarea bind:value={comments} style="width: 100%"></textarea>
     </div>
-</CommentModal>
+</MainModal>
+<MainModal
+        bind:show={creatingTasks}
+        onSave={() => saveTaskCreation(tasksPreviews)}
+>
+    <h2 slot="header">
+        Batch add tasks
+    </h2>
+    <div style="width: 100%;">
+        <BatchTaskCreationForm
+                bind:previews={tasksPreviews}
+                regex={data.roomInfo.taskRegex}
+        />
+    </div>
+</MainModal>
 
 <style>
     .cardSelect {
@@ -452,10 +561,10 @@
     }
 
     .voteCompleted > td {
-        background-color: #00aa00;
+        background-color: #00aa0050;
     }
 
     .voting > td {
-        background-color: #aaaa00;
+        background-color: #aaaa0050;
     }
 </style>

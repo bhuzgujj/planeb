@@ -3,7 +3,8 @@ import {queries} from "$lib/db/queries.js";
 import logger from "$lib/logger.js";
 import {DATABASE, DATABASE_FOLDER} from "$env/static/private";
 import fs from "fs";
-import ls from "../../constant.js";
+import {createId} from "../../idGenerator.js";
+import constants from "../../constant.js";
 
 /**
  * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
@@ -101,10 +102,10 @@ function fillState(dir, fileName) {
     let db = new Database(`${dir}/${fileName}`, { verbose: logger.debug })
     try {
         let prep = db.prepare("select * from metadatas where keys = ?")
-        let name = prep.get(ls.rooms.dbMetadata.name)
-        let presisted = prep.get(ls.rooms.dbMetadata.presisted)
-        let owner = prep.get(ls.rooms.dbMetadata.owner)
-        let taskPrefix = prep.get(ls.rooms.dbMetadata.taskRegex)
+        let name = prep.get(constants.rooms.dbMetadata.name)
+        let presisted = prep.get(constants.rooms.dbMetadata.presisted)
+        let owner = prep.get(constants.rooms.dbMetadata.owner)
+        let taskPrefix = prep.get(constants.rooms.dbMetadata.taskRegex)
         db.close()
         if (!presisted || !presisted?.vals) {
             logger.debug(`Deleting room: ${dir}/${fileName}`)
@@ -183,6 +184,28 @@ export async function modifyCardSet(id, cardSet) {
 }
 
 /**
+ * Delete a cardset
+ * @param {string} id
+ * @return {Promise<void>}
+ */
+export async function deleteSet(id) {
+    let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
+    let db;
+    try {
+        db = new Database(dbPath, { verbose: logger.debug });
+        db.prepare("delete from cards_set where id = ?;").run(id);
+        cardsSet.delete(id);
+    } catch (e) {
+        logger.error(`card set failed modification: ${e}`)
+    } finally {
+        if (db) {
+            db.close()
+        }
+    }
+
+}
+
+/**
  * Vote in a room
  * @param {import("$lib/network.js").Vote} vote
  * @return {Promise<void>}
@@ -201,6 +224,11 @@ export async function vote(vote) {
     }
 }
 
+/**
+ * Set final vote on a task
+ * @param {import("$lib/network.js").AcceptedVote} vote
+ * @return {Promise<void>}
+ */
 export async function acceptVote(vote) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${vote.roomId}.db`;
     try {
@@ -208,7 +236,88 @@ export async function acceptVote(vote) {
         db.prepare("update tasks set card_id = ? where id = ?;")
             .run(vote.card, vote.tasksId)
     } catch (e) {
-        logger.error(`"${vote.roomId}:${vote.userId}" database failed to add a vote ${vote}: ${e}`)
+        logger.error(`"${vote.roomId}:${vote.tasksId}" database failed to add a vote ${vote.card}: ${e}`)
+    }
+}
+
+/**
+ * Make a mod of a user
+ * @param {{ userId: string, moderator: boolean, roomId: string }} mod
+ */
+export async function moderation(mod) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${mod.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("update users set moderator = ? where id = ?;")
+            .run(+mod.moderator, mod.userId)
+    } catch (e) {
+        logger.error(`"${mod.roomId}:${mod.userId}" database failed to add a vote ${mod.moderator}: ${e}`)
+    }
+}
+
+/**
+ * Check if a user is mod of a room
+ * @param {string} roomId
+ * @param {string} userId
+ * @return {Promise<boolean>}
+ */
+export async function isModerator(roomId, userId) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        const mod = db.prepare("select * from users where moderator = 1 and id = ?;").all(userId)
+        return mod.length > 0
+    } catch (e) {
+        logger.error(`"${roomId}:${userId}" database failed to check mod status: ${e}`)
+        return false
+    }
+}
+
+/**
+ * Check if a user is mod of a room
+ * @param {string} roomId
+ * @param {string | undefined} userId
+ * @return {boolean}
+ */
+export function isOwner(roomId, userId) {
+    if (userId === undefined)
+        return false
+    const owner = rooms.get(roomId)?.owner;
+    if (!owner) {
+        return false
+    }
+    return owner === userId
+}
+
+/**
+ * Comment a task
+ * @param {import("$lib/network.js").Comment} comment
+ */
+export async function saveComment(comment) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${comment.roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("update tasks set comments = ? where id = ?;")
+            .run(comment.comment, comment.tasksId)
+    } catch (e) {
+        logger.error(`"${comment.roomId}:${comment.tasksId}" database failed to add a vote ${comment.comment}: ${e}`)
+    }
+}
+
+/**
+ * Delete a task
+ * @param {string} taskId
+ * @param {string} roomId
+ * @return {Promise<void>}
+ */
+export async function deleteTask(taskId, roomId) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        db.prepare("delete from tasks where id = ?;")
+            .run(taskId)
+    } catch (e) {
+        logger.error(`"${roomId}:${taskId}" database failed to remove task: ${e}`)
     }
 }
 
@@ -219,25 +328,30 @@ export async function acceptVote(vote) {
  * @param {{id: string, name: string}} moderator
  * @param {CardSet} cards
  * @param {string} taskRegex
+ * @param {import("$lib/data.js").Task[]} tasks
  * @return {Promise<string>}
  */
-export async function createRoom(name, isPersisted, moderator, cards, taskRegex) {
-    const roomId = crypto.randomUUID();
+export async function createRoom(name, isPersisted, moderator, cards, taskRegex, tasks) {
+    const roomId = createId();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
         logger.debug(`Initializing database "${roomId}:${name}"...`);
         await executeQuery(dbPath, "create_room", db => {
             const md = db.prepare("insert into metadatas (keys, vals) values (?, ?);")
-            md.run(ls.rooms.dbMetadata.name, name);
-            md.run(ls.rooms.dbMetadata.presisted, isPersisted);
-            md.run(ls.rooms.dbMetadata.owner, moderator.id);
+            md.run(constants.rooms.dbMetadata.name, name);
+            md.run(constants.rooms.dbMetadata.presisted, isPersisted);
+            md.run(constants.rooms.dbMetadata.owner, moderator.id);
             if (taskRegex)
-                md.run(ls.rooms.dbMetadata.taskRegex, taskRegex);
+                md.run(constants.rooms.dbMetadata.taskRegex, taskRegex);
             const mod = db.prepare("insert into users (id, names, moderator) values (?, ?, 1);")
             mod.run(moderator.id, moderator.name);
             const card = db.prepare("insert into cards (id, val, label) values (?, ?, ?);")
             for (const c of cards.cards) {
                 card.run(c.id, c.value, c.label);
+            }
+            const insertTask = db.prepare("insert into tasks (id, task_no, names) values (?, ?, ?);")
+            for (const task of tasks) {
+                insertTask.run(createId(), task.no ?? null, task.name);
             }
         })
         logger.debug(`"${roomId}:${name}" database initialized`)
@@ -261,7 +375,7 @@ export async function createRoom(name, isPersisted, moderator, cards, taskRegex)
  * @returns {Promise<string>}
  */
 export async function addTaskToRoom(task, roomId) {
-    const taskId = crypto.randomUUID();
+    const taskId = createId();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     let db;
     try {
@@ -397,14 +511,14 @@ export function getRoomsById(id) {
 
 /**
  * Delete a db
- * @param {string} id
+ * @param {string} roomId
  * @return {RoomInfo | undefined}
  */
-export function deleteRoomById(id) {
-    let roomDeleted = rooms.get(id);
+export function deleteRoomById(roomId) {
+    let roomDeleted = rooms.get(roomId);
     if (roomDeleted) {
-        rooms.delete(id)
-        deleteRoom(id);
+        rooms.delete(roomId)
+        deleteRoom(roomId);
     }
     return roomDeleted
 }
@@ -424,7 +538,7 @@ function deleteRoom(id) {
 /**
  * Delete database not persisted
  */
-export function cleanup() {
+export async function cleanup() {
     for (const [id, room] of rooms.entries()) {
         if (!room.isPersisted)
             deleteRoom(id)

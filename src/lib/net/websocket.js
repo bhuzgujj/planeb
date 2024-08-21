@@ -3,6 +3,7 @@ import logger from "$lib/logger.js";
 import {addUserToRoom} from "$lib/gateway.js";
 import Database from "better-sqlite3";
 import {queries} from "$lib/db/queries.js";
+import {createId} from "../../idGenerator.js";
 
 /**
  * @typedef {import('$lib/network.d.ts').CrudAction} UpdateType
@@ -12,14 +13,18 @@ import {queries} from "$lib/db/queries.js";
  * @typedef {import('$lib/network.d.ts').ListEvent} ListEvent
  * @typedef {import('$lib/network.d.ts').RoomEvent} RoomEvent
  * @typedef {import('$lib/network.d.ts').ListenerType} ListenerType
+ * @typedef {import('$lib/network.d.ts').MessageType} MessageType
  */
-
-const db = new Database(":memory:", { verbose: logger.debug })
 
 /** @type {WebSocketServer | null} */
 let socket = null;
+
+const updateUserQuery = "update users set vote = ? where id = ?;";
+
 /** @type {Map<string, {socket: any, ip: string}>} */
 const connectionPool = new Map();
+
+const cache = new Database(":memory:", { verbose: logger.debug })
 
 function init() {
     if (socket) {
@@ -29,15 +34,15 @@ function init() {
     socket = new WebSocketServer({
         port: 43594
     })
-    db.exec(queries.readQuery("connections"))
+    cache.exec(queries.readQuery("connections"))
     /** @type {Promise<void>} */
     const creation = new Promise((resolve, reject) => {
         if (!socket)
             throw new Error("WebSocket not initialized");
         try {
             socket.on("connection", (ws, req) => {
-                const id = crypto.randomUUID();
-                db.prepare("insert into connections (id) values (?)").run(id)
+                const id = createId();
+                cache.prepare("insert into connections (id) values (?)").run(id)
                 connectionPool.set(id, {socket: ws, ip: req.socket.remoteAddress})
                 ws.on("message", onMessage(id))
                 ws.on("close", onClose(id))
@@ -60,42 +65,47 @@ function init() {
  * @return {(data: string) => void}
  */
 function onMessage(id) {
-    return (data) => {
-        logger.debug(`Message received from ${id} ${data}`)
+    return (msg) => {
+        logger.debug(`Message received from ${id} ${msg}`)
         /**
-         * @template {ListenerType} T
-         * @type {import("$lib/network.js").WebSocketRegisteringEvent<T>}
+         * @template {ListenerType | MessageType} T
+         * @type {import("$lib/network.js").WebSocketMessageEvent<T>}
          */
-        const item = JSON.parse(data)
+        const item = JSON.parse(msg)
         /** @type {any} */
-        const evt = item.data
+        const data = item.data
         switch (item.type) {
             case "list":
-                db.prepare("update connections set listed = ? where id = ?;").run(+evt, id)
+                cache.prepare("update connections set listed = ? where id = ?;").run(+data, id)
                 break;
             case "room":
                 /** @type {import("$lib/network.js").EventData<"room">} */
-                const room = evt
+                const room = data
                 if (room.action === "remove") {
-                    db.prepare("update connections set rooms_id = null where id = ?;").run(id)
+                    cache.prepare("update connections set rooms_id = null where id = ?;").run(id)
                 } else if (room.user) {
                     const rooms = []
                     rooms.push(room.roomId)
                     addUserToRoom(rooms, item.userId, room.user.name)
                         .then(() => {
-                            db.prepare("insert or ignore into rooms(id) values (?);").run(room.roomId)
-                            db.prepare("update connections set rooms_id = ? where id = ?;").run(room.roomId, id)
-                            const task = db.prepare("select * from rooms where id = ?;").get(room.roomId)
-                            const users = db.prepare("select * from users;").all()
+                            cache.prepare("insert or ignore into rooms(id) values (?);").run(room.roomId)
+                            cache.prepare("update connections set rooms_id = ? where id = ?;").run(room.roomId, id)
+                            const task = cache.prepare("select * from rooms where id = ?;").get(room.roomId)
+                            /** @type {{ id: string, vote: string | null }[]} */
+                            const users = cache.prepare("select * from users;").all()
                             if (task.task) {
+                                /** @type {{[id: string]: string}} */
+                                const voted = {}
+                                for (const user of users) {
+                                    if (user.vote) {
+                                        voted[user.id] = user.vote
+                                    }
+                                }
                                 notify({
                                     evt: {
                                         voting: {
                                             taskId: task.task,
-                                            voted: users.reduce((acc, user) => {
-                                                acc[user.id] = user.vote
-                                                return acc
-                                            }, {})
+                                            voted
                                         }
                                     }
                                 }, "room", [room.roomId])
@@ -107,24 +117,34 @@ function onMessage(id) {
                 }
                 break;
             case "votes":
-                if (evt?.taskId !== undefined) {
-                    db.prepare("update users set vote = null;").run()
-                    db.prepare("update rooms set task = ? where id = ?;").run(evt.taskId, evt.roomId)
+                if (data?.taskId !== undefined) {
+                    cache.prepare("update users set vote = null;").run()
+                    cache.prepare("update rooms set task = ? where id = ?;").run(data.taskId, data.roomId)
                     notify({
                         evt: {
                             voting: {
-                                taskId: evt.taskId
+                                taskId: data.taskId
                             }
                         }
-                    }, "room", [evt.roomId])
+                    }, "room", [data.roomId])
                 }
                 break;
+            case "result":
+                notify({
+                    evt: {
+                        voting: {
+                            taskId: data.taskId,
+                            show: true
+                        }
+                    }
+                }, "room", [data.roomId])
+                break;
             case "sets":
-                db.prepare("update connections set setted = ? where id = ?;").run(+evt, id)
+                cache.prepare("update connections set setted = ? where id = ?;").run(+data, id)
                 break;
         }
-        db.prepare("insert or ignore into users(id) values (?);").run(item.userId)
-        db.prepare("update connections set users_id = ? where id = ?;").run(item.userId, id)
+        cache.prepare("insert or ignore into users(id) values (?);").run(item.userId)
+        cache.prepare("update connections set users_id = ? where id = ?;").run(item.userId, id)
     }
 }
 
@@ -135,7 +155,7 @@ function onMessage(id) {
  */
 function onClose(id) {
     return (data) => {
-        db.prepare("delete from connections where id = ?;").run(id)
+        cache.prepare("delete from connections where id = ?;").run(id)
     }
 }
 
@@ -156,7 +176,8 @@ function onError(id) {
  * @return {string[] | undefined}
  */
 export function getSubscribedRoom(userId) {
-    const connections = db.prepare("select rooms_id from connections where users_id = ?;").all(userId)
+    /** @type {{rooms_id: string}[] | undefined} */
+    const connections = cache.prepare("select rooms_id from connections where users_id = ?;").all(userId)
     return connections?.map(rooms => rooms.rooms_id)
 }
 
@@ -170,7 +191,7 @@ export function notify(evt, type, roomIds) {
     let connectionIds;
     switch (type) {
         case "list":
-            connectionIds = db.prepare("select id from connections where listed = ?;").all(1)
+            connectionIds = cache.prepare("select id from connections where listed = ?;").all(1)
             if (connectionIds) {
                 for (const {id} of connectionIds) {
                     logger.info(`Sending to ${id}:${connectionPool.get(id)?.ip}`)
@@ -182,7 +203,7 @@ export function notify(evt, type, roomIds) {
             }
             break
         case "sets":
-            connectionIds = db.prepare("select id from connections where setted = ?;").all(1)
+            connectionIds = cache.prepare("select id from connections where setted = ?;").all(1)
             if (connectionIds) {
                 for (const {id} of connectionIds) {
                     logger.info(`Sending to ${id}:${connectionPool.get(id)?.ip}`)
@@ -195,7 +216,7 @@ export function notify(evt, type, roomIds) {
             break
         case "room":
             for (const roomId of roomIds) {
-                connectionIds = db.prepare("select id from connections where rooms_id = ?;").all(roomId)
+                connectionIds = cache.prepare("select id from connections where rooms_id = ?;").all(roomId)
                 if (connectionIds) {
                     for (const {id} of connectionIds) {
                         logger.info(`Sending to ${id}:${connectionPool.get(id)?.ip}`)
@@ -216,16 +237,16 @@ export function notify(evt, type, roomIds) {
  * @return {Promise<void>}
  */
 export async function vote(vote) {
-    db.prepare("update users set vote = ? where id = ?;").run(vote.card, vote.userId)
+    cache.prepare(updateUserQuery).run(vote.card, vote.userId)
 }
 
-function close() {
+async function close() {
     for (const connection of connectionPool.values())
-        connection?.close()
+        connection.socket.close()
     socket?.close(() => {
         socket = null
     })
-    db.close()
+    cache.close()
 }
 
 export default {

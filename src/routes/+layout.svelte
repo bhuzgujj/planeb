@@ -1,6 +1,6 @@
 <script>
     import {onMount} from "svelte";
-    import ls from "../constant.js";
+    import constants from "../constant.js";
 
     let name = ""
 
@@ -9,7 +9,7 @@
      */
     function nameChange(evt) {
         if (evt.key === "Enter") {
-            let userId = localStorage.getItem(ls.itemKeys.id)
+            let userId = localStorage.getItem(constants.localStorageKeys.id)
             if (userId) {
                 fetch(`/users/${userId}`, {
                     method: "PUT",
@@ -18,7 +18,7 @@
                     })
                 })
                     .then(() => {
-                        localStorage.setItem(ls.itemKeys.name, name)
+                        localStorage.setItem(constants.localStorageKeys.name, name)
                     })
             } else {
                 console.error("No userid found in localStorage, key looked is:" + "planeb.id")
@@ -26,8 +26,8 @@
         }
     }
 
-    onMount(()=>{
-        name = localStorage.getItem(ls.itemKeys.name) ?? ""
+    onMount(() => {
+        name = localStorage.getItem(constants.localStorageKeys.name) ?? ""
     })
 </script>
 
@@ -39,11 +39,11 @@
         <a href="/cards">Card sets</a>
     </div>
     <label>
-        Name: <input type="text" style="padding: 0; margin: 0;" on:keypress={(e) => nameChange(e)} bind:value={name}/>
+        Name: <input type="text" on:keypress={(e) => nameChange(e)} bind:value={name}/>
     </label>
 </nav>
 
-<div class="fcenter">
+<div class="fcenter" style="margin-bottom: 1rem; margin-top: 1rem;">
     <div class="fcol">
         <slot/>
     </div>

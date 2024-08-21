@@ -2,6 +2,7 @@ import * as db from './db/database.js';
 import * as ws from './net/websocket.js';
 import logger from "$lib/logger.js";
 import {putUserInRoom} from "./db/database.js";
+import {createId} from "../idGenerator.js";
 
 /**
  * @typedef {import('$lib/data.d.ts').RoomInfo} RoomInfo
@@ -42,10 +43,11 @@ export function getRooms() {
  * @param {{id: string, name: string}} moderator
  * @param {CardSet} cards
  * @param {string} taskPrefix
+ * @param {import("$lib/data.js").Task[]} tasks
  * @return {Promise<string>}
  */
-export function createRoom(name, isPersisted, moderator, cards, taskPrefix) {
-    return db.createRoom(name, isPersisted, moderator, cards, taskPrefix);
+export function createRoom(name, isPersisted, moderator, cards, taskPrefix, tasks) {
+    return db.createRoom(name, isPersisted, moderator, cards, taskPrefix, tasks);
 }
 
 /**
@@ -120,18 +122,18 @@ export function getCardSets() {
  * @returns {Promise<void>}
  */
 export async function createCardSet(name) {
-    const id= crypto.randomUUID()
+    const id= createId()
     /** @type {CardSet} */
     let set = {
         name,
         cards: [
             {
-                id: crypto.randomUUID(),
+                id: createId(),
                 value: 1,
                 label: "1"
             },
             {
-                id: crypto.randomUUID(),
+                id: createId(),
                 value: 2,
                 label: "2"
             },
@@ -152,7 +154,6 @@ export async function createCardSet(name) {
  * @returns {Promise<void>}
  */
 export async function modifySet(id, cardSet) {
-    logger.debug(cardSet)
     await db.modifyCardSet(id, cardSet)
     await ws.notify({
         action: "update",
@@ -162,29 +163,51 @@ export async function modifySet(id, cardSet) {
 }
 
 /**
- * Add a task to a room
- * @param {import("$lib/data.js").Task} task
- * @param {string} roomId
- * @returns {Promise<void>}
+ * Delete card set
+ * @param {string} id
+ * @return {Promise<void>}
  */
-export async function addTaskToRoom(task, roomId) {
-    const id = await db.addTaskToRoom(task, roomId)
-    /** @type {import("$lib/network.js").RoomEvent} */
-    const evt = {
-        evt: {
-            task: {
-                action: "add",
-                id,
-                evt: {
-                    name: task.name,
-                    no: task.no,
+export async function deleteSet(id) {
+    await db.deleteSet(id)
+    await ws.notify({
+        action: "remove",
+        id,
+        evt: {}
+    }, "sets", [])
+}
+
+/**
+ * Add a task to a room
+ * @param {import("$lib/data.js").Task[]} tasks
+ * @param {string} roomId
+ * @param {string} userId
+ * @returns {Promise<boolean>}
+ */
+export async function addTaskToRoom(tasks, roomId, userId) {
+    const isAllowed = await db.isModerator(roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
+    for (const task of tasks) {
+        const id = await db.addTaskToRoom(task, roomId)
+        /** @type {import("$lib/network.js").RoomEvent} */
+        const evt = {
+            evt: {
+                task: {
+                    action: "add",
+                    id,
+                    evt: {
+                        name: task.name,
+                        no: task.no,
+                    }
                 }
             }
-        }
-    };
-    const rooms = []
-    rooms.push(roomId)
-    await ws.notify(evt, "room", rooms)
+        };
+        const rooms = []
+        rooms.push(roomId)
+        await ws.notify(evt, "room", rooms)
+    }
+    return true
 }
 
 /**
@@ -207,11 +230,70 @@ export async function votes(vote) {
 }
 
 /**
- * Vote in a room
- * @param {import("$lib/network.js").Vote} vote
- * @return {Promise<void>}
+ * Comment a task
+ * @param {import("$lib/network.js").Comment} comment
+ * @param {string} userId
+ * @return {Promise<boolean>}
  */
-export async function acceptVote(vote) {
+export async function saveComment(comment, userId) {
+    const isAllowed = await db.isModerator(comment.roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
+    const dbExec = db.saveComment(comment)
+    ws.notify({
+        evt: {
+            task: {
+                action: "update",
+                id: comment.tasksId,
+                evt: {
+                    comments: comment.comment
+                }
+            },
+        }
+    }, "room", [comment.roomId])
+    await Promise.all([dbExec])
+    return true
+}
+
+/**
+ * Make a mod of a user
+ * @param {{ userId: string, targetId: string, moderator: boolean, roomId: string }} mod
+ * @return {Promise<boolean>}
+ */
+export async function moderation(mod) {
+    const isAllowed = db.isOwner(mod.roomId, mod.userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
+    const dbExec = db.moderation({
+        userId: mod.targetId,
+        moderator: mod.moderator,
+        roomId: mod.roomId,
+    })
+    ws.notify({
+        evt: {
+            user: {
+                id: mod.targetId,
+                moderator: mod.moderator,
+            },
+        }
+    }, "room", [mod.roomId])
+    await Promise.all([dbExec])
+    return true
+}
+
+/**
+ * Vote in a room
+ * @param {import("$lib/network.js").AcceptedVote} vote
+ * @param {string} userId
+ * @return {Promise<boolean>}
+ */
+export async function acceptVote(vote, userId) {
+    const isAllowed = await db.isModerator(vote.roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
     const dbExec = db.acceptVote(vote)
     ws.notify({
         evt: {
@@ -225,4 +307,30 @@ export async function acceptVote(vote) {
         }
     }, "room", [vote.roomId])
     await Promise.all([dbExec])
+    return true
+}
+
+/**
+ * Delete task
+ * @param {string} taskId
+ * @param {string} roomId
+ * @param {string} userId
+ * @return {Promise<boolean>}
+ */
+export async function deleteTask(taskId, roomId, userId) {
+    const isAllowed = await db.isModerator(roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
+    const dbExec = db.deleteTask(taskId, roomId)
+    ws.notify({
+        evt: {
+            task: {
+                action: "remove",
+                id: taskId
+            },
+        }
+    }, "room", [roomId])
+    await Promise.all([dbExec])
+    return true
 }
