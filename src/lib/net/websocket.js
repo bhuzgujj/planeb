@@ -19,8 +19,6 @@ import {createId} from "../../idGenerator.js";
 /** @type {WebSocketServer | null} */
 let socket = null;
 
-const updateUserQuery = "update users set vote = ? where id = ?;";
-
 /** @type {Map<string, {socket: any, ip: string}>} */
 const connectionPool = new Map();
 
@@ -177,8 +175,8 @@ function onError(id) {
  */
 export function getSubscribedRoom(userId) {
     /** @type {{rooms_id: string}[] | undefined} */
-    const connections = cache.prepare("select rooms_id from connections where users_id = ?;").all(userId)
-    return connections?.map(rooms => rooms.rooms_id)
+    const c = cache.prepare("select rooms_id from connections where users_id = ?;").all(userId)
+    return c?.map(rooms => rooms.rooms_id)
 }
 
 /**
@@ -237,7 +235,7 @@ export function notify(evt, type, roomIds) {
  * @return {Promise<void>}
  */
 export async function vote(vote) {
-    cache.prepare(updateUserQuery).run(vote.card, vote.userId)
+    cache.prepare("update users set vote = ? where id = ?;").run(vote.card, vote.userId)
 }
 
 async function close() {

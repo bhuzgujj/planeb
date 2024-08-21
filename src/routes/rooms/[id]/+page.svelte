@@ -352,7 +352,6 @@
     }
 
     onMount(() => {
-        console.log(data)
         userId = localStorage.getItem(constants.localStorageKeys.id) ?? ""
         userName = localStorage.getItem(constants.localStorageKeys.name) ?? ""
         /** @type {import('$lib/network.d.ts').WebSocketRegisteringEvent<"room">} */
