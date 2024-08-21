@@ -14,7 +14,7 @@ export async function PATCH({params, request}) {
     } else {
         resp = await saveComment({
             roomId: params.id,
-            comment: body.comment,
+            comment: body.comment ?? "",
             tasksId: params.tasksId
         }, body.userId)
     }

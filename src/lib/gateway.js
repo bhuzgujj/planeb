@@ -274,7 +274,6 @@ export async function moderation(mod) {
     ws.notify({
         evt: {
             user: {
-                action: "update",
                 id: mod.targetId,
                 moderator: mod.moderator,
             },

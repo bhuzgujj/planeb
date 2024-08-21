@@ -1,10 +1,13 @@
-import {deleteRoomById} from "$lib/db/database.js";
+import {deleteRoomById, isOwner} from "$lib/db/database.js";
 import {json} from "@sveltejs/kit";
 import {updateList, moderation} from "$lib/gateway.js";
 
 export async function DELETE({params, request}) {
-    const body = request.json()
-    let roomInfo = deleteRoomById(params.id, body.userId);
+    const body = await request.json()
+    if (!isOwner(params.id, body.userId)) {
+        return json({ message: "Forbidden" }, {status: 403})
+    }
+    let roomInfo = deleteRoomById(params.id);
     if (!roomInfo)
         return json({message: "Room not found"}, {
             status: 404

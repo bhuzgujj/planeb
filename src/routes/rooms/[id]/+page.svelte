@@ -332,14 +332,10 @@
     }
 
     /**
-     *
      * @param {import("$lib/data.js").UserInfo} user
      */
     function canActOn(user) {
         return isMod && data.roomInfo.owner !== user.id && user.id !== userId
-    }
-
-    function closeTaskCreation() {
     }
 
     /**
@@ -535,13 +531,12 @@
 </MainModal>
 <MainModal
         bind:show={creatingTasks}
-        onClose={closeTaskCreation}
         onSave={() => saveTaskCreation(tasksPreviews)}
 >
     <h2 slot="header">
         Batch add tasks
     </h2>
-    <div style="width: 100%; height: 40em">
+    <div style="width: 100%;">
         <BatchTaskCreationForm
                 bind:previews={tasksPreviews}
                 regex={data.roomInfo.taskRegex}

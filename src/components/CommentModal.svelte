@@ -2,7 +2,7 @@
     /** @type boolean */
     export let show;
     /** @type {() => void} */
-    export let onClose;
+    export let onClose = () => {};
     /** @type {() => void} */
     export let onSave;
     /** @type HTMLDialogElement */

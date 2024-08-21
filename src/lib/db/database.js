@@ -183,6 +183,11 @@ export async function modifyCardSet(id, cardSet) {
     }
 }
 
+/**
+ * Delete a cardset
+ * @param {string} id
+ * @return {Promise<void>}
+ */
 export async function deleteSet(id) {
     let dbPath = `${DATABASE_FOLDER}/${DATABASE}`;
     let db;
@@ -271,10 +276,12 @@ export async function isModerator(roomId, userId) {
 /**
  * Check if a user is mod of a room
  * @param {string} roomId
- * @param {string} userId
+ * @param {string | undefined} userId
  * @return {boolean}
  */
 export function isOwner(roomId, userId) {
+    if (userId === undefined)
+        return false
     const owner = rooms.get(roomId)?.owner;
     if (!owner) {
         return false
@@ -297,6 +304,12 @@ export async function saveComment(comment) {
     }
 }
 
+/**
+ * Delete a task
+ * @param {string} taskId
+ * @param {string} roomId
+ * @return {Promise<void>}
+ */
 export async function deleteTask(taskId, roomId) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
@@ -498,14 +511,14 @@ export function getRoomsById(id) {
 
 /**
  * Delete a db
- * @param {string} id
+ * @param {string} roomId
  * @return {RoomInfo | undefined}
  */
-export function deleteRoomById(id) {
-    let roomDeleted = rooms.get(id);
+export function deleteRoomById(roomId) {
+    let roomDeleted = rooms.get(roomId);
     if (roomDeleted) {
-        rooms.delete(id)
-        deleteRoom(id);
+        rooms.delete(roomId)
+        deleteRoom(roomId);
     }
     return roomDeleted
 }
