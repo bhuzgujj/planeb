@@ -2,8 +2,9 @@ import {deleteRoomById} from "$lib/db/database.js";
 import {json} from "@sveltejs/kit";
 import {updateList, moderation} from "$lib/gateway.js";
 
-export async function DELETE({params}) {
-    let roomInfo = deleteRoomById(params.id);
+export async function DELETE({params, request}) {
+    const body = request.json()
+    let roomInfo = deleteRoomById(params.id, body.userId);
     if (!roomInfo)
         return json({message: "Room not found"}, {
             status: 404
@@ -19,12 +20,17 @@ export async function DELETE({params}) {
 }
 
 export async function PATCH({params, request}) {
-    /** @type {{ userId: string, moderator: boolean }} */
+    /** @type {{ userId: string, moderator: boolean, targetId: string }} */
     const body = await request.json()
-    await moderation({
+    const response = await moderation({
         userId: body.userId,
+        targetId: body.targetId,
         moderator: body.moderator,
         roomId: params.id
     })
-    return json(body)
+    if (response) {
+        return json(body)
+    } else {
+        return json({ message: "Forbidden" }, {status: 403})
+    }
 }

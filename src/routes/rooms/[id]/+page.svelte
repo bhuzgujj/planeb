@@ -213,7 +213,10 @@
             return
         }
         fetch(`/rooms/${data.id}/tasks/${id}`, {
-            method: "DELETE"
+            method: "DELETE",
+            body: JSON.stringify({
+                userId: userId,
+            })
         })
             .then(() => next())
     }
@@ -253,7 +256,9 @@
         if (card !== null && taskSelected !== null) {
             fetch(`/rooms/${data.id}/tasks/${taskSelected.id}/${userId}`, {
                 method: "PATCH",
-                body: JSON.stringify({cardId: card.id})
+                body: JSON.stringify({
+                    cardId: card.id
+                })
             })
         }
     }
@@ -275,6 +280,7 @@
             fetch(`/rooms/${data.id}/tasks/${taskSelected.id}`, {
                 method: "PATCH",
                 body: JSON.stringify({
+                    userId: userId,
                     cardId: acceptedCard
                 })
             })
@@ -300,6 +306,7 @@
             fetch(`/rooms/${data.id}/tasks/${task.id}`, {
                 method: "PATCH",
                 body: JSON.stringify({
+                    userId: userId,
                     comment: comments
                 })
             });
@@ -317,7 +324,8 @@
         fetch(`/rooms/${data.id}`, {
             method: "PATCH",
             body: JSON.stringify({
-                userId: user.id,
+                userId: userId,
+                targetId: user.id,
                 moderator: !user.moderator
             })
         })
@@ -340,7 +348,10 @@
     function saveTaskCreation(tasks) {
         fetch(`/rooms/${data.id}/tasks`, {
             method: "POST",
-            body: JSON.stringify(tasks)
+            body: JSON.stringify({
+                userId: userId,
+                tasks
+            })
         })
     }
 

@@ -237,7 +237,7 @@ export async function acceptVote(vote) {
 
 /**
  * Make a mod of a user
- * @param {{ userId: string, moderator: boolean, roomId }} mod
+ * @param {{ userId: string, moderator: boolean, roomId: string }} mod
  */
 export async function moderation(mod) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${mod.roomId}.db`;
@@ -248,6 +248,38 @@ export async function moderation(mod) {
     } catch (e) {
         logger.error(`"${mod.roomId}:${mod.userId}" database failed to add a vote ${mod.moderator}: ${e}`)
     }
+}
+
+/**
+ * Check if a user is mod of a room
+ * @param {string} roomId
+ * @param {string} userId
+ * @return {Promise<boolean>}
+ */
+export async function isModerator(roomId, userId) {
+    let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
+    try {
+        const db = new Database(dbPath, { verbose: logger.debug })
+        const mod = db.prepare("select * from users where moderator = 1 and id = ?;").all(userId)
+        return mod.length > 0
+    } catch (e) {
+        logger.error(`"${roomId}:${userId}" database failed to check mod status: ${e}`)
+        return false
+    }
+}
+
+/**
+ * Check if a user is mod of a room
+ * @param {string} roomId
+ * @param {string} userId
+ * @return {boolean}
+ */
+export function isOwner(roomId, userId) {
+    const owner = rooms.get(roomId)?.owner;
+    if (!owner) {
+        return false
+    }
+    return owner === userId
 }
 
 /**

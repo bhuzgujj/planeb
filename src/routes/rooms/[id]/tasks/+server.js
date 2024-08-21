@@ -3,6 +3,10 @@ import {addTaskToRoom} from "$lib/gateway.js";
 
 export async function POST({params, request}) {
     const body = await request.json()
-    await addTaskToRoom(body, params.id)
-    return json(body)
+    const response = await addTaskToRoom(body.tasks, params.id, body.userId)
+    if (response) {
+        return json(body)
+    } else {
+        return json({ message: "Forbidden" }, {status: 403})
+    }
 }

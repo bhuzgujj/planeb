@@ -180,9 +180,14 @@ export async function deleteSet(id) {
  * Add a task to a room
  * @param {import("$lib/data.js").Task[]} tasks
  * @param {string} roomId
- * @returns {Promise<void>}
+ * @param {string} userId
+ * @returns {Promise<boolean>}
  */
-export async function addTaskToRoom(tasks, roomId) {
+export async function addTaskToRoom(tasks, roomId, userId) {
+    const isAllowed = await db.isModerator(roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
     for (const task of tasks) {
         const id = await db.addTaskToRoom(task, roomId)
         /** @type {import("$lib/network.js").RoomEvent} */
@@ -202,6 +207,7 @@ export async function addTaskToRoom(tasks, roomId) {
         rooms.push(roomId)
         await ws.notify(evt, "room", rooms)
     }
+    return true
 }
 
 /**
@@ -226,8 +232,14 @@ export async function votes(vote) {
 /**
  * Comment a task
  * @param {import("$lib/network.js").Comment} comment
+ * @param {string} userId
+ * @return {Promise<boolean>}
  */
-export async function saveComment(comment) {
+export async function saveComment(comment, userId) {
+    const isAllowed = await db.isModerator(comment.roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
     const dbExec = db.saveComment(comment)
     ws.notify({
         evt: {
@@ -241,32 +253,48 @@ export async function saveComment(comment) {
         }
     }, "room", [comment.roomId])
     await Promise.all([dbExec])
+    return true
 }
 
 /**
  * Make a mod of a user
- * @param {{ userId: string, moderator: boolean, roomId }} mod
+ * @param {{ userId: string, targetId: string, moderator: boolean, roomId: string }} mod
+ * @return {Promise<boolean>}
  */
 export async function moderation(mod) {
-    const dbExec = db.moderation(mod)
+    const isAllowed = db.isOwner(mod.roomId, mod.userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
+    const dbExec = db.moderation({
+        userId: mod.targetId,
+        moderator: mod.moderator,
+        roomId: mod.roomId,
+    })
     ws.notify({
         evt: {
             user: {
                 action: "update",
-                id: mod.userId,
+                id: mod.targetId,
                 moderator: mod.moderator,
             },
         }
     }, "room", [mod.roomId])
     await Promise.all([dbExec])
+    return true
 }
 
 /**
  * Vote in a room
  * @param {import("$lib/network.js").AcceptedVote} vote
- * @return {Promise<void>}
+ * @param {string} userId
+ * @return {Promise<boolean>}
  */
-export async function acceptVote(vote) {
+export async function acceptVote(vote, userId) {
+    const isAllowed = await db.isModerator(vote.roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
     const dbExec = db.acceptVote(vote)
     ws.notify({
         evt: {
@@ -280,15 +308,21 @@ export async function acceptVote(vote) {
         }
     }, "room", [vote.roomId])
     await Promise.all([dbExec])
+    return true
 }
 
 /**
  * Delete task
  * @param {string} taskId
  * @param {string} roomId
- * @return {Promise<void>}
+ * @param {string} userId
+ * @return {Promise<boolean>}
  */
-export async function deleteTask(taskId, roomId) {
+export async function deleteTask(taskId, roomId, userId) {
+    const isAllowed = await db.isModerator(roomId, userId)
+    if (!isAllowed) {
+        return isAllowed
+    }
     const dbExec = db.deleteTask(taskId, roomId)
     ws.notify({
         evt: {
@@ -299,4 +333,5 @@ export async function deleteTask(taskId, roomId) {
         }
     }, "room", [roomId])
     await Promise.all([dbExec])
+    return true
 }

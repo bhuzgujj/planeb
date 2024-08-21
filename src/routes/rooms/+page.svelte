@@ -14,7 +14,12 @@
      * @param {string} id
      */
     function deleteRoom(id) {
-        fetch(`/rooms/${id}`, { method: 'DELETE' })
+        fetch(`/rooms/${id}`, {
+            method: 'DELETE' ,
+            body: JSON.stringify({
+                userId: userId,
+            })
+        })
             .finally(() => {
                 rooms.delete(id)
                 rooms = rooms
