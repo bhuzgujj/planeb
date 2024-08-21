@@ -239,7 +239,7 @@ export async function acceptVote(vote) {
  * Make a mod of a user
  * @param {{ userId: string, moderator: boolean, roomId }} mod
  */
-export function moderation(mod) {
+export async function moderation(mod) {
     let dbPath = `${DATABASE_FOLDER}/rooms/${mod.roomId}.db`;
     try {
         const db = new Database(dbPath, { verbose: logger.debug })

@@ -2,9 +2,10 @@
     import constants from "../../../constant.js";
     import {onDestroy, onMount} from "svelte";
     import socket from "$lib/net/socket.js";
-    import CommentModal from "../../../components/CommentModal.svelte";
+    import MainModal from "../../../components/CommentModal.svelte";
     import Graph from "../../../components/Graph.svelte";
     import TaskRow from "./TaskRow.svelte";
+    import BatchTaskCreationForm from "../../../components/BatchTaskCreationForm.svelte";
 
     /** @type {import('./$types').PageData} */
     export let data;
@@ -15,6 +16,10 @@
     let userName = ""
     /** @type {Array<import('$lib/data.d.ts').UserInfo>} */
     let users = data.users
+    /** @type {import("$lib/data.js").Task[]} */
+    let tasksPreviews = []
+    /** @type boolean */
+    let creatingTasks = false
     /** @type {boolean} */
     $: voted = users.filter(u => u.vote === undefined || u.vote === null).length < 1
     /** @type {boolean} */
@@ -53,7 +58,7 @@
         }
     }
 
-    function closeDialog() {
+    function closeComment() {
         taskCommenting = null
     }
 
@@ -160,26 +165,22 @@
      * Create a task in the current room
      */
     function addTask() {
+        /** @type {string | undefined} */
         let no;
-        let name;
+        /** @type {string} */
+        let name = newTask.trim();
         if (data.roomInfo.taskRegex) {
-            const matchs = newTask.trim().match(data.roomInfo.taskRegex)
+            const matchs = name.match(data.roomInfo.taskRegex)
             if (matchs) {
                 no = matchs[0]
-                name = newTask.trim()
-            } else {
-                name = newTask.trim()
             }
-        } else {
-            name = newTask.trim()
         }
-        fetch(`/rooms/${data.id}/tasks`, {
-            method: "POST",
-            body: JSON.stringify({
-                no,
-                name
-            })
-        })
+        /** @type {import("$lib/data.js").Task} */
+        const body = {
+            no,
+            name
+        }
+        saveTaskCreation([body])
     }
 
     /**
@@ -218,9 +219,13 @@
     }
 
     function next() {
-        if (taskIdSelected !== null && taskIdSelected + 1 < tasks.length) {
-            taskIdSelected += 1
-            taskIdSelected = taskIdSelected
+        if (taskIdSelected !== null) {
+            if (taskIdSelected + 1 < tasks.length) {
+                taskIdSelected += 1
+                taskIdSelected = taskIdSelected
+            } else {
+                taskIdSelected = null;
+            }
         }
         socket.send({
             taskId: taskIdSelected !== null ? tasks[taskIdSelected].id : null,
@@ -298,7 +303,7 @@
                     comment: comments
                 })
             });
-            closeDialog()
+            closeComment()
         } else {
             console.error("Cannot save comment to a non existing task")
         }
@@ -324,6 +329,19 @@
      */
     function canActOn(user) {
         return isMod && data.roomInfo.owner !== user.id && user.id !== userId
+    }
+
+    function closeTaskCreation() {
+    }
+
+    /**
+     * @param {import("$lib/data.js").Task[]} tasks
+     */
+    function saveTaskCreation(tasks) {
+        fetch(`/rooms/${data.id}/tasks`, {
+            method: "POST",
+            body: JSON.stringify(tasks)
+        })
     }
 
     onMount(() => {
@@ -437,6 +455,7 @@
     <label>Tasks: <input type="text" bind:value={newTask}>
         <button disabled={!isMod} on:click={() => addTask()}>Add</button>
     </label>
+    <button disabled={!isMod} on:click={() => creatingTasks = !creatingTasks}>Batch add task</button>
     <div style="height: 100%">
         <button style="height: 100%" disabled={!showResultEnable} on:click={() => showResult()}>Show result</button>
     </div>
@@ -491,9 +510,9 @@
         </tr>
     {/if}
 </table>
-<CommentModal
+<MainModal
         bind:show={showCommentModal}
-        onClose={closeDialog}
+        onClose={closeComment}
         onSave={saveComment}
 >
     <h2 slot="header">
@@ -502,7 +521,22 @@
     <div style="width: 100%">
         <textarea bind:value={comments} style="width: 100%"></textarea>
     </div>
-</CommentModal>
+</MainModal>
+<MainModal
+        bind:show={creatingTasks}
+        onClose={closeTaskCreation}
+        onSave={() => saveTaskCreation(tasksPreviews)}
+>
+    <h2 slot="header">
+        Batch add tasks
+    </h2>
+    <div style="width: 100%; height: 40em">
+        <BatchTaskCreationForm
+                bind:previews={tasksPreviews}
+                regex={data.roomInfo.taskRegex}
+        />
+    </div>
+</MainModal>
 
 <style>
     .cardSelect {

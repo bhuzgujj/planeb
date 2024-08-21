@@ -178,28 +178,30 @@ export async function deleteSet(id) {
 
 /**
  * Add a task to a room
- * @param {import("$lib/data.js").Task} task
+ * @param {import("$lib/data.js").Task[]} tasks
  * @param {string} roomId
  * @returns {Promise<void>}
  */
-export async function addTaskToRoom(task, roomId) {
-    const id = await db.addTaskToRoom(task, roomId)
-    /** @type {import("$lib/network.js").RoomEvent} */
-    const evt = {
-        evt: {
-            task: {
-                action: "add",
-                id,
-                evt: {
-                    name: task.name,
-                    no: task.no,
+export async function addTaskToRoom(tasks, roomId) {
+    for (const task of tasks) {
+        const id = await db.addTaskToRoom(task, roomId)
+        /** @type {import("$lib/network.js").RoomEvent} */
+        const evt = {
+            evt: {
+                task: {
+                    action: "add",
+                    id,
+                    evt: {
+                        name: task.name,
+                        no: task.no,
+                    }
                 }
             }
-        }
-    };
-    const rooms = []
-    rooms.push(roomId)
-    await ws.notify(evt, "room", rooms)
+        };
+        const rooms = []
+        rooms.push(roomId)
+        await ws.notify(evt, "room", rooms)
+    }
 }
 
 /**
