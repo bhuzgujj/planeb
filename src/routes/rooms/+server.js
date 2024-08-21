@@ -12,9 +12,17 @@ export async function POST({request}) {
         persisted: body.persisted, 
         moderator: body.moderator,
         cards: body.cards,
-        taskPrefix: body.taskPrefix
+        taskPrefix: body.taskPrefix,
+        tasks: body.tasks,
     })}`);
-    let id = await createRoom(body.name, body.persisted, body.moderator, body.cards, body.taskPrefix);
+    let id = await createRoom(
+        body.name,
+        body.persisted,
+        body.moderator,
+        body.cards,
+        body.taskPrefix,
+        body.tasks
+    );
     updateList({
         action: "add",
         id,

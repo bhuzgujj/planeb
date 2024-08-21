@@ -43,10 +43,11 @@ export function getRooms() {
  * @param {{id: string, name: string}} moderator
  * @param {CardSet} cards
  * @param {string} taskPrefix
+ * @param {import("$lib/data.js").Task[]} tasks
  * @return {Promise<string>}
  */
-export function createRoom(name, isPersisted, moderator, cards, taskPrefix) {
-    return db.createRoom(name, isPersisted, moderator, cards, taskPrefix);
+export function createRoom(name, isPersisted, moderator, cards, taskPrefix, tasks) {
+    return db.createRoom(name, isPersisted, moderator, cards, taskPrefix, tasks);
 }
 
 /**

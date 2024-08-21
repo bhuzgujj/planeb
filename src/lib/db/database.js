@@ -283,9 +283,10 @@ export async function deleteTask(taskId, roomId) {
  * @param {{id: string, name: string}} moderator
  * @param {CardSet} cards
  * @param {string} taskRegex
+ * @param {import("$lib/data.js").Task[]} tasks
  * @return {Promise<string>}
  */
-export async function createRoom(name, isPersisted, moderator, cards, taskRegex) {
+export async function createRoom(name, isPersisted, moderator, cards, taskRegex, tasks) {
     const roomId = createId();
     let dbPath = `${DATABASE_FOLDER}/rooms/${roomId}.db`;
     try {
@@ -302,6 +303,10 @@ export async function createRoom(name, isPersisted, moderator, cards, taskRegex)
             const card = db.prepare("insert into cards (id, val, label) values (?, ?, ?);")
             for (const c of cards.cards) {
                 card.run(c.id, c.value, c.label);
+            }
+            const insertTask = db.prepare("insert into tasks (id, task_no, names) values (?, ?, ?);")
+            for (const task of tasks) {
+                insertTask.run(createId(), task.no ?? null, task.name);
             }
         })
         logger.debug(`"${roomId}:${name}" database initialized`)
