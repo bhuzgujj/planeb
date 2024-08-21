@@ -61,7 +61,7 @@ function log(msg, lvl) {
         if (showOrigin) {
             let path = (new Error()).stack?.split("\n")[3]?.trim()
             if (path) {
-                path = path.split("(")[1].split(")")[0]
+                path = path.split("(")[1]?.split(")")[0]
             }
             logs(`(${time}) [${lvl}] ${path}: ${message}`, loggedLevel);
         } else {

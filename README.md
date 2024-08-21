@@ -2,4 +2,7 @@
 A tool to help refinements
 
 ## To use
-TODO
+```shell
+npm install
+vite dev
+```

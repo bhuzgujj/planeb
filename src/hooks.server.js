@@ -22,7 +22,7 @@ function start() {
         }
     })
     websocket.init()
-    process.on('sveltekit:shutdown', async (reason) => {await shutdown })
+    process.on('sveltekit:shutdown', async (reason) => {await shutdown() })
     process.on('SIGINT', async (reason) => { await shutdown(); });
     process.on('SIGTERM', async (reason) => { await shutdown(); });
 }

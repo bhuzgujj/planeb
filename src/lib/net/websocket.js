@@ -25,7 +25,7 @@ const connectionPool = new Map();
 const cache = createDb(":memory:")
 
 function init() {
-    if (socket) {
+    if (socket !== null) {
         return
     }
     logger.debug("Initializing websocket...")

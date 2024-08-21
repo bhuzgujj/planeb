@@ -4,7 +4,6 @@
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
-		"dev-int": "vite dev --host 192.168.1.136 --port 4173",
 		"build": "vite build",
 		"preview": "vite preview",
 		"clean": "node clean.js",
