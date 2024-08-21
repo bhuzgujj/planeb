@@ -18,6 +18,7 @@ static/.env
 static/.env.example
 !static/.env.example
 !.env.test
+!.env.example
 
 # Vite
 vite.config.js.timestamp-*
