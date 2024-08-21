@@ -13,11 +13,11 @@ databases
 Thumbs.db
 
 # Env
+.env
 static/.env
 static/.env.example
 !static/.env.example
 !.env.test
-.env
 
 # Vite
 vite.config.js.timestamp-*
