@@ -67,7 +67,7 @@ export function init(config) {
 /**
  * Create a db connection
  * @param {string} dbPath
- * @return {Database}
+ * @return {import("better-sqlite3").Database}
  */
 export function createDb(dbPath) {
     return new Database(dbPath, { verbose: logger.db });

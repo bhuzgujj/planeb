@@ -12,25 +12,46 @@
 				margin: 0 0 0 0;
 				padding: 0 0 0 0;
 				color: #f0f0f0;
+				font-size: 18px;
 			}
 
 			.main {
-				display: flex;
 				justify-content: center;
 				flex-direction: column;
 				width: 100%;
+				height: 100%;
+				flex-grow: 1;
+				justify-self: start;
+			}
+
+			html,
+			body {
+				height: 100%;
 			}
 
 			nav {
 				display: flex;
-				background: #222222;
+				background: #222;
 				padding: 10px;
 			}
 
 			nav > * {
-				background: #222222;
+				background: #222;
 				padding: 0;
 				margin: 0;
+			}
+
+			/* Text */
+			h1 {
+				font-size: 28px;
+			}
+
+			h2 {
+				font-size: 24px;
+			}
+
+			h3 {
+				font-size: 20px;
 			}
 
 			/* Classes */
@@ -61,44 +82,44 @@
 
 			.bdel:hover {
 				transition: 200ms;
-				background: #990000;
+				background: #900;
 			}
 
 			.bdel:active {
-				background: #880000;
-				border: solid 1px #880000;
+				background: #800;
+				border: solid 1px #800;
 			}
 
 			/* Button */
 			button {
 				padding: 2px 2rem;
 				border-radius: 5px;
-				border: solid 1px #555555;
+				border: solid 1px #555;
 			}
 
 			button:hover {
 				transition: 100ms;
-				background: #555555;
+				background: #555;
 			}
 
 			button:active {
-				background: #666666;
+				background: #555;
 			}
 
 			button:disabled {
-				background: #222222;
-				color: #444444;
-				border: solid 1px #444444;
+				background: #222;
+				color: #444;
+				border: solid 1px #444;
 			}
 
 			button:disabled:hover {
 				transition: 100ms;
-				background: #222222;
+				background: #222;
 			}
 
 			button:disabled:active {
 				background: #151515;
-				border: solid 1px #444444;
+				border: solid 1px #444;
 			}
 
 			/* Anchor */
@@ -108,7 +129,7 @@
 
 			/* Tables */
 			table {
-				border: solid 1px #555555;
+				border: solid 1px #555;
 				border-radius: 5px;
 				margin-bottom: 1rem;
 				margin-top: 1rem;
@@ -129,29 +150,29 @@
 			}
 
 			tr > th {
-				border-bottom: solid 1px #555555;
+				border-bottom: solid 1px #555;
 			}
 
 			tr:nth-child(even) > td {
-				background: #222222;
+				background: #222;
 			}
 
 			tr:hover {
 				transition: 200ms;
-				background: #666666;
+				background: #666;
 			}
 
 			tr:hover > td {
 				transition: 200ms;
-				background: #666666;
+				background: #666;
 			}
 
 			tr:hover:active {
-				background: #bbbbbb;
+				background: #bbb;
 			}
 
 			tr:hover:active > td {
-				background: #bbbbbb;
+				background: #bbb;
 			}
 
 			td > input {
@@ -167,14 +188,13 @@
 				margin: 5px;
 			}
 
+			form > * {
+				background: transparent;
+			}
+
 			label > input[type=text] {
 				width: 50%;
 				height: 1.25rem;
-			}
-
-			label > select {
-				width: 50%;
-				height: 1.5rem;
 			}
 
 			form > table {
@@ -182,20 +202,86 @@
 			}
 
 			input {
-				border-radius: 5px;
+				outline: 0;
+			}
+
+			.form_group {
+				position: relative;
+				padding: 20px 0 0;
+				width: 100%;
+				height: 40px;
+			}
+
+			.form_group > label {
+				background: transparent;
+				position: absolute;
+				display: block;
+				top: 0;
+				transition: 0.2s;
+				pointer-events: none;
+				color: #666;
+			}
+
+			.form_group > input {
+				background: transparent;
+				position: absolute;
+				display: block;
+				border: none;
+				width: 100%;
+				border-bottom: 2px solid #666;
+				top: 20px;
+			}
+
+			.form_group > input::placeholder {
+				color: transparent;
+			}
+
+			.form_group > input:focus {
+				transition: 0.2s;
+				border: none;
+				border-bottom: 2px solid #f0f0f0;
+			}
+
+			.form_group > input:placeholder-shown ~ label {
+				position: absolute;
+				display: block;
+				top: 20px;
+				transition: 0.2s;
+				cursor: text;
+				font-weight: normal;
+			}
+
+			.form_group > input:focus ~ label {
+				position: absolute;
+				top: 0;
+				display: block;
+				transition: 0.2s;
+				color: #f0f0f0;
+				font-size: 16px;
+			}
+
+			.form_group > input:required, .form_group > input:invalid {
+				box-shadow: none;
 			}
 
 			textarea {
 				border-radius: 5px;
+				outline: 0;
+				padding: 5px;
 			}
 
 			select {
 				border-radius: 5px;
+				border: 2px #444 solid;
+			}
+
+			select:focus {
+				border: 2px #ccc solid;
 			}
 		</style>
 	</head>
 
-	<body data-sveltekit-preload-data="hover">
+	<body data-sveltekit-preload-data="hover" style="height: 100%; display: flex; flex-direction: column;">
 		<div class="main">%sveltekit.body%</div>
 	</body>
 </html>

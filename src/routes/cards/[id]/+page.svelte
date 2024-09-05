@@ -92,3 +92,10 @@
     {/if}
 </table>
 <button on:click={() => {submit()}} disabled={!isSendable}>Submit</button>
+
+<style>
+    input {
+        border: none;
+        background: transparent;
+    }
+</style>

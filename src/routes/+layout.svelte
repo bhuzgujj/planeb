@@ -32,15 +32,17 @@
 </script>
 
 
-<nav>
-    <div style="height: 100%; flex-grow: 1">
+<nav style="height: 40px">
+    <div style="height: 100%; flex-grow: 1; display: flex; align-items: center;">
         <a href="/">Home</a>
         <a href="/rooms">Rooms</a>
         <a href="/cards">Card sets</a>
+        <a href="https://github.com/bhuzgujj/planeb/issues">Report a bug</a>
     </div>
-    <label>
-        Name: <input type="text" on:keypress={(e) => nameChange(e)} bind:value={name}/>
-    </label>
+    <div class="form_group" style="width: 200px; height: 20px">
+        <input name="username" type="text" on:keypress={(e) => nameChange(e)} bind:value={name}/>
+        <label for="username">Name</label>
+    </div>
 </nav>
 
 <div class="fcenter" style="margin-bottom: 1rem; margin-top: 1rem;">
@@ -56,7 +58,6 @@
     }
 
     a {
-        vertical-align: center;
         padding: 2px 2rem;
         border: solid 1px #555555;
         margin: 5px;

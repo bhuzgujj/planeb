@@ -3,6 +3,7 @@
     import {onDestroy, onMount} from "svelte";
     import constants from "../../constant.js";
     import socket from "$lib/net/socket.js";
+    import InputGroup from "../../components/InputGroup.svelte";
 
     /**
      * @typedef {import('$lib/data.d.ts').CardSet} CardSet
@@ -53,15 +54,7 @@
     })
 </script>
 <form method="post">
-    {#if form?.nameError}
-        <p class="terror">
-            {form?.nameError}
-        </p>
-    {/if}
-    <label>
-        Name: <input name="name" type="text" value={form?.name ?? ""} />
-    </label>
-    <br>
+    <InputGroup name="Name" type="text" inputName="name" value={form?.name || ""} error={form?.nameError}/>
     <button type="submit">Create</button>
 </form>
 <table style="width: 100%">

@@ -3,6 +3,9 @@
     import {goto} from "$app/navigation";
     import constants from "../../../constant.js";
     import BatchTaskCreationForm from "../../../components/BatchTaskCreationForm.svelte";
+    import InputGroup from "../../../components/InputGroup.svelte";
+    import ToggleInput from "../../../components/ToggleInput.svelte";
+    import CardSet from "../../../components/CardSet.svelte";
 
     /** @type {import('./$types').ActionData} */
     export let form;
@@ -14,12 +17,13 @@
     let regex = ""
     /** @type {import("$lib/data.js").Task[]} */
     let previews = []
-    /** @type {string | null} */
-    let selectedSet = null
+    /** @type {string} */
+    let selectedSet = ""
 </script>
 <h1>Create a room</h1>
 <br>
 <form
+        autocomplete="off"
         method="post"
         use:enhance={(res) => {
                 return async ({ result }) => {
@@ -49,54 +53,36 @@
 >
     <div style="width:45%;">
         <h2>Room info</h2>
-        {#if form?.nameError}
-            <p class="terror">
-                {form?.nameError}
-            </p>
-        {/if}
-        <label>Room name<br><input name="name" type="text" value={form?.name ?? ""}></label>
-        <br style="margin-bottom: 15px">
-        <label>Persist room: <input name="persisted" type="checkbox"></label>
-        <br style="margin-bottom: 15px">
-        <label>Task number prefix (regex)<br><input name="task_prefix" type="text" bind:value={regex}></label>
-        <br style="margin-bottom: 15px">
-        {#if form?.setError}
-            <p class="terror">
-                {form?.setError}
-            </p>
-        {/if}
-        <label>Selected Cards<br>
-            <select name="sets" bind:value={selectedSet}>
-                {#each sets.keys() as id}
-                    <option value={id}>{sets.get(id)?.name}</option>
-                {/each}
-            </select>
-        </label>
-        <br style="margin-bottom: 15px">
-        <table style="width: 100%">
-            <thead>
-                <tr>
-                    <th style="width: 75%">Label</th>
-                    <th style="padding-left: 10px">Value</th>
-                </tr>
-            </thead>
-            {#if selectedSet !== null}
-                {#each sets.get(selectedSet)?.cards ?? [] as card}
-                    <tr id={card.id}>
-                        <td>
-                            {card.label}
-                        </td>
-                        <td>
-                            {card.value}
-                        </td>
-                    </tr>
-                {/each}
-            {:else}
-                <tr>
-                    <td style="text-align: center;" colspan="2">Select a card set</td>
-                </tr>
-            {/if}
-        </table>
+        <InputGroup
+            name="Room name"
+            type="text"
+            inputName="name"
+            value={form?.name ?? ""}
+            error={form?.nameError}
+        />
+        <InputGroup
+            name="Task number prefix (regex)"
+            type="text"
+            inputName="task_prefix"
+            value={form?.name ?? ""}
+            error={undefined}
+        />
+        <ToggleInput
+                name="Persist room"
+                inputName="persisted"
+        />
+        <br>
+        <div style="height: 400px">
+            <CardSet cards={sets.get(selectedSet ?? "")?.cards ?? []} >
+                <select name="sets" bind:value={selectedSet}>
+                    <option value="" disabled selected style="color: #444">Select a card set</option>
+                    {#each sets.keys() as id}
+                        <option value={id}>{sets.get(id)?.name}</option>
+                    {/each}
+                </select>
+            </CardSet>
+        </div>
+        <br>
         <button type="submit">Create</button>
     </div>
     <div style="width: 50%">
@@ -110,19 +96,8 @@
 </form>
 
 <style>
-    label {
-        width: 300px;
-    }
-
-    tr > td {
-        text-align: center;
-    }
-
-    tr > th {
-        text-align: center;
-    }
-
-    input[type=text] {
+    select {
         width: 100%;
+        padding-left: 5px;
     }
 </style>

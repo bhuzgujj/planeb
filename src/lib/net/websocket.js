@@ -16,10 +16,10 @@ import {createDb} from "$lib/db/database.js";
  * @typedef {import('$lib/network.d.ts').MessageType} MessageType
  */
 
-/** @type {WebSocketServer | null} */
+/** @type {import("ws").WebSocketServer | null} */
 let socket = null;
 
-/** @type {Map<string, {socket: any, ip: string}>} */
+/** @type {Map<string, {socket: import("ws").WebSocket, ip: string}>} */
 const connectionPool = new Map();
 
 const cache = createDb(":memory:")
@@ -38,14 +38,7 @@ function init() {
         if (!socket)
             throw new Error("WebSocket not initialized");
         try {
-            socket.on("connection", (ws, req) => {
-                const id = createId();
-                cache.prepare("insert into connections (id) values (?)").run(id)
-                connectionPool.set(id, {socket: ws, ip: req.socket.remoteAddress})
-                ws.on("message", onMessage(id))
-                ws.on("close", onClose(id))
-                ws.on("error", onError(id))
-            })
+            socket.on("connection", (ws, req) => onConnection(ws, req))
             logger.debug("Websocket initialized")
             resolve()
 
@@ -57,16 +50,17 @@ function init() {
 }
 
 /**
- * Verify if the connection id is attributed to the userId
- * @param connectionId
- * @param userId
- * @return {boolean}
+ *
+ * @param {import("ws").WebSocket} ws
+ * @param {import("ws").HMRBroadcasterClient} req
  */
-function userIsValid(connectionId, userId) {
-    const conn = cache.prepare("select * from connections where users_id = ?").all(userId);
-    if (conn.length !== 1)
-        return true;
-    return conn[0].id === connectionId
+function onConnection(ws, req) {
+    const id = createId();
+    cache.prepare("insert into connections (id) values (?)").run(id)
+    connectionPool.set(id, {socket: ws, ip: req.socket.remoteAddress})
+    ws.on("message", onMessage(id))
+    ws.on("close", onClose(id))
+    ws.on("error", onError(id))
 }
 
 /**
@@ -82,10 +76,6 @@ function onMessage(id) {
          * @type {import("$lib/network.js").WebSocketMessageEvent<T>}
          */
         const item = JSON.parse(msg)
-        if (!userIsValid(id, item.userId)) {
-            logger.warn(`Connection id "${id}:${connectionPool.get(id)?.ip}" try to impersonate user "${item.userId}"`)
-            return;
-        }
         /** @type {any} */
         const data = item.data
         switch (item.type) {
@@ -255,13 +245,23 @@ export async function vote(vote) {
     cache.prepare("update users set vote = ? where id = ?;").run(vote.card, vote.userId)
 }
 
-async function close() {
-    for (const connection of connectionPool.values())
-        connection.socket.close()
-    socket?.close(() => {
-        socket = null
+/**
+ * @return {Promise<void>}
+ */
+function close() {
+    return new Promise((resolve, reject) => {
+        for (const connection of connectionPool.values())
+            connection.socket.close()
+        cache.close()
+        if (socket) {
+            socket?.close(() => {
+                socket = null
+                resolve()
+            })
+        } else {
+            resolve()
+        }
     })
-    cache.close()
 }
 
 export default {

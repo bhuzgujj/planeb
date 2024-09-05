@@ -6,6 +6,7 @@
     import Graph from "../../../components/Graph.svelte";
     import TaskRow from "./TaskRow.svelte";
     import BatchTaskCreationForm from "../../../components/BatchTaskCreationForm.svelte";
+    import CardSet from "../../../components/CardSet.svelte";
 
     /** @type {import('./$types').PageData} */
     export let data;
@@ -402,12 +403,16 @@
                 <button on:click={() => acceptCard()} disabled={acceptedCard===null || !isMod}>Save</button>
             </label>
         {:else if taskSelected !== null}
-            <h2>Voting for {taskSelected.name}</h2>
-            <div class="cardSelect">
-                {#each cards as card}
-                    <button class="card" on:click={() => changeVote(card)}
-                            disabled={cardSelected === card}>{card.label}</button>
-                {/each}
+            <div style="height: 400px;">
+                <CardSet
+                        cards={cards}
+                        bind:selected={cardSelected}
+                        select={(card) => changeVote(card)}
+                        showValue={false}
+                >
+                    <h2>Voting for {taskSelected.name}</h2>
+
+                </CardSet>
             </div>
         {:else}
             <h2>Waiting for a task to be selected</h2>
