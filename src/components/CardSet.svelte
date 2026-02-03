@@ -2,58 +2,78 @@
     /** @type {import("$lib/data.js").Card[]} */
     export let cards;
     /** @type {boolean} */
-    export let showValue = false
+    export let showValue = true
     /** @type {import("$lib/data.js").Card | null} */
     export let selected = null;
     /** @type {function(import("$lib/data.js").Card):void} */
     export let select = (card) => {};
-    $: max = cards.length + 2
-    $: third = max / 3
-    $: half = max / 2
 
     /**
      *
      * @param {number} number
+     * @param {number} max
      * @return string
      */
-    function getRed(number) {
+    function getRed(number, max) {
+        const half = max / 2
+        const quarter = half / 2
         if (number > half)
             return "0";
-        return ((number/half) * 10).toFixed(0);
+        if (number < quarter)
+            return ((number/quarter) * 255).toFixed(0);
+        else
+            return ((2 - (number/quarter)) * 255).toFixed(0);
     }
 
     /**
      *
      * @param {number} number
+     * @param {number} max
      * @return string
      */
-    function getGreen(number) {
-        if (number < third)
+    function getGreen(number, max) {
+        const third = max / 3
+        const half = max / 2
+        const quarter = half / 2
+        if (number < third || number > third + half)
             return "0";
-        return (((number - third)/half) * 10).toFixed(0);
+        const num = number - third;
+        if (num < quarter)
+            return ((num/quarter) * 255).toFixed(0);
+        else
+            return ((2 - (num/quarter)) * 255).toFixed(0);
     }
 
     /**
      *
      * @param {number} number
+     * @param {number} max
      * @return string
      */
-    function getBlue(number) {
+    function getBlue(number, max) {
+        const third = max / 3
+        const half = max / 2
+        const quarter = half / 2
         if (number < third * 2)
             return "0";
-        return (((number - third * 2)/half) * 10).toFixed(0);
+        const num = number - (third * 2);
+        if (num < quarter)
+            return ((num/quarter) * 255).toFixed(0);
+        else
+            return ((2 - (num/quarter)) * 255).toFixed(0);
     }
 
     /**
      *
      * @param {number} number
+     * @param {number} max
      * @return string
      */
-    function getColor(number) {
-        let r = getRed(number);
-        let g = getGreen(number);
-        let b = getBlue(number);
-        return `#${r}${g}${b}`;
+    function getColor(number, max) {
+        let r = getRed(number, max);
+        let g = getGreen(number, max);
+        let b = getBlue(number, max);
+        return `rgba(${r},${g},${b},75)`;
     }
 
     /**
@@ -73,7 +93,7 @@
         {#each cards as card, number}
             <button 
                     class="cscard" 
-                    style="background: {getColor(number + 1)}"
+                    style="background: {getColor(number + 1, cards.length)}"
                     disabled={card.id === selected?.id}
                     on:click={() => onSelect(card)}
             >
@@ -83,7 +103,7 @@
                     {:else}
                         <p>{card.label}</p>
                         {#if showValue}
-                            <p>{card.value}</p>
+                            <p>Value: {card.value}</p>
                         {/if}
                     {/if}
                 </div>
@@ -149,6 +169,7 @@
         align-items: center;
         justify-content: center;
         display: flex;
+        flex-direction: column;
     }
 
     .setname {
@@ -160,5 +181,14 @@
         -webkit-user-select: none;
         -ms-user-select: none;
         user-select: none;
+        font-weight: normal;
+        font-style: italic;
+        font-size: 15px;
+    }
+
+    p:first-child {
+        font-weight: bold;
+        font-style: normal;
+        font-size: 20px;
     }
 </style>
